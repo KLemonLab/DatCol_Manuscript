@@ -16,14 +16,40 @@ This document lists all R packages used across analysis notebooks in this reposi
 #| warning: FALSE
 #| message: FALSE
 
-library(tidyverse)      # Data manipulation and ggplot2
-library(readxl)         # Reading Excel files
-library(ggtext)         # Enhanced text rendering in ggplot2
-library(scales)         # Scaling functions for ggplot2
-library(ggh4x)          # Extensions for ggplot2
-library(lme4)           # Linear mixed-effects models
-library(lmerTest)       # Tests for linear mixed-effects models
-library(emmeans)        # Estimated marginal means (EMMs) for linear models
+# Core tidyverse (data handling + plotting)
+library(tidyverse)
+
+# Data input/output
+library(readxl)      # Read Excel files
+library(openxlsx)    # Write Excel files
+library(png)         # Read PNG images
+
+# Visualization (ggplot2 ecosystem)
+library(ggtext)      # Rich text in ggplot
+library(scales)      # Axis scaling
+library(ggh4x)       # ggplot extensions
+library(ggpubr)      # Publication-ready plots
+library(cowplot)     # Plot composition
+library(plotly)      # Interactive plots
+library(ggVennDiagram) # Venn diagrams
+library(grid)        # Low-level graphics
+
+# Statistical modeling
+library(lme4)        # Mixed-effects models
+library(lmerTest)    # p-values for lme4
+library(emmeans)     # Estimated marginal means
+library(broom)       # Tidy model outputs
+library(mclust)      # Clustering & mixture models
+
+# Tables and reporting
+library(kableExtra)  # Styled tables
+
+# Numerical / utility
+library(pracma)      # Numerical functions (including AUC)
+
+# Bioinformatics / sequencing
+library(Biostrings)  # Sequence analysis
+library(DESeq2)      # Differential expression
 ```
 
 ## Session Information
