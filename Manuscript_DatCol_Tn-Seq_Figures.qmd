@@ -1,0 +1,490 @@
+---
+format:
+  html:
+    suppress-bibliography: true
+---
+
+# Essential Genes Analysis {.unnumbered .unlisted}
+
+```{r}
+library(tidyverse)
+library(ggVennDiagram)
+library(ggpubr)
+library(plotly)
+library(scales)
+```
+
+```{r}
+# Define folder paths
+FOLDER_PATH <- Sys.getenv("BOX_PATH")
+TnSeq_folder <- file.path(FOLDER_PATH, "Tn-Seq")
+sites_folder <- file.path(TnSeq_folder, "sites")
+genomes_folder <- file.path(TnSeq_folder, "RefSeqs")
+
+dataframes_folder <- file.path(TnSeq_folder, "tables")
+if (!file.exists(dataframes_folder)) {
+  dir.create(dataframes_folder, recursive = TRUE)
+}
+
+figures_folder <- file.path(TnSeq_folder, "figures")
+if (!file.exists(figures_folder)) {
+  dir.create(figures_folder, recursive = TRUE)
+}
+```
+
+## Data Preparation
+
+```{r}
+# List all *.TRUE.DESeq.csv files recursively
+files <- list.files(path = sites_folder, pattern = ".TRUE.DESeq.csv", full.names = TRUE, recursive = TRUE)
+
+# Extract subfolder names and get the part after the underscore
+subfolder_names <- basename(dirname(files))
+cleaned_names <- sub(".*_", "", subfolder_names)
+
+# Read all the files into a list and rename based on cleaned subfolder names
+data_list <- lapply(files, read.csv)
+names(data_list) <- cleaned_names
+
+# Clean column names in each data frame
+data_list <- Map(function(df, cleaned_name) {
+  colnames(df) <- gsub(paste0("_", cleaned_name), "", colnames(df))
+  df
+}, data_list, cleaned_names)
+
+# Combine all datasets into one and add a Condition column
+EG_data <- bind_rows(
+  Map(function(df, cleaned_name) {
+    df %>%
+      mutate(Condition = cleaned_name) 
+  }, data_list, cleaned_names)
+) 
+
+# Levels Re-factoring and column renaming
+EG_data <- EG_data %>%
+  select(-X) %>%
+  mutate_if(is.character, as.factor) %>%
+  mutate(Condition = factor(Condition,
+                            levels = c("input", "lac"),  
+                            labels = c("Input", "LAC"))) %>%
+  rename_with(~ gsub("_TRUE", "", .), everything()) %>%
+  rename(log2FC = log2FoldChange,
+         Sample1_numreads = Sau_USA300_FPR3757.1,
+         Sample2_numreads = Sau_USA300_FPR3757.2,
+         Sample1_numsites = Sau_USA300_FPR3757.1.1,
+         Sample2_numsites = Sau_USA300_FPR3757.2.1) 
+```
+
+```{r}
+# Identify samples with less than 10 reads in both samples for the Input condition
+lowcount_genes <- EG_data %>% filter((Condition == "Input" & (Sample1_numreads < 10 & Sample2_numreads < 10)))
+# Filter those lowcount_genes from EG_data
+EG_data <- EG_data %>% filter(!(id %in% lowcount_genes$id))
+
+# Count genes with at least 10 reads in either sample for each condition
+detected_genes_input <- EG_data %>% filter((Condition == "Input" & (Sample1_numreads >= 10 | Sample2_numreads >= 10)))
+detected_genes_LAC <- EG_data %>% filter((Condition == "LAC" & (Sample1_numreads >= 10 | Sample2_numreads >= 10)))
+
+nrow(detected_genes_input)
+nrow(detected_genes_LAC)
+```
+
+```{r}
+# Wide version of the dataframe for scatter plots
+EG_data_wide <- EG_data %>%
+  select(id, genes.name, log2FC, padj, stat, Essentiality, Condition) %>%
+  pivot_wider(
+    names_from = Condition,            
+    values_from = c(log2FC, padj, stat, Essentiality),
+    names_glue = "{.value}_{Condition}"  
+  ) %>% 
+  mutate(log2FC_diff_LAC_vs_Input = log2FC_LAC - log2FC_Input)
+
+# Merge df_counts with annotation info 
+Sau_gtf <- readRDS(file.path(genomes_folder, "Sau_KPL4403_Ibberson_annot.rds"))  %>%
+  select(-start, -end)
+EG_data <- left_join(EG_data, Sau_gtf, by = c("id" = "Geneid")) %>%
+  select(-seqname, -score, -frame, -source, -feature) %>%
+  select(Condition, genes.name, everything())
+EG_data_wide <- left_join(EG_data_wide, Sau_gtf, by = c("id" = "Geneid")) %>%
+  select(-seqname, -score, -frame, -source, -feature) %>%
+  select(genes.name, everything()) %>%
+  select(genes.name:aa_sequence)
+
+# Save dataframes
+write_csv(EG_data, file.path(dataframes_folder, "TNSeq_5772_EG.csv"))
+saveRDS(EG_data, file.path(dataframes_folder, "TNSeq_5772_EG.rds"))
+write_csv(EG_data_wide, file.path(dataframes_folder, "TNSeq_5772_EGwide.csv"))
+saveRDS(EG_data_wide, file.path(dataframes_folder, "TNSeq_5772_EGwide.rds"))
+
+# Read COG names/colors
+COG_categories <- read_csv(file.path(genomes_folder, "COG24_Categories.csv"), show_col_types = FALSE)
+color_mapping <- setNames(COG_categories$func_COG24_color, COG_categories$func_COG24_CATEGORY)
+```
+
+## Summary Plots
+
+```{r, fig.width=12, fig.height=6, fig.align="center"}
+# Summarize the number of essential genes by condition
+Essential_EG_data <- EG_data %>%
+  filter(Essentiality == "Reduced") %>%
+  group_by(Condition) %>%
+  summarize(count = n()) 
+
+# Create a bar plot
+plot_num <- ggplot(Essential_EG_data) +
+  geom_bar(stat = "identity", position = "dodge", aes(x = Condition, y = count, fill = Condition)) +
+  labs(y = "# Essential Genes", x = "") +
+  scale_fill_manual(values = c("grey", "#FF2400")) +
+  scale_y_continuous(expand = c(0,0)) +
+  theme_bw(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.position = "none",
+        plot.margin = margin(t = 0, r = 20, b = 0, l = 0))   
+
+# Create a list of gene IDs for each contrast where 'selected == TRUE'
+selected_venn <- EG_data %>%
+  filter(Essentiality == "Reduced") %>%  
+  group_by(Condition) %>%
+  summarise(genes = list(id), .groups = 'drop') %>%
+  pull(genes, name = Condition)
+
+# Plot the Venn diagram for the contrasts
+plot_venn <- ggVennDiagram(selected_venn,
+                           label = "percent",
+                           label_percent_digit = 1,
+                           label_size = 4,
+                           label_alpha = 0, 
+                           set_size = 3,
+                           set_color = c("grey", "#FF2400")) + 
+  scale_fill_gradientn(colours = c("white", "grey40")) +
+  theme(legend.position = "none")
+
+plots_genesDE <- ggarrange(plot_num, plot_venn, ncol = 2, nrow = 1, widths = c(0.7, 1))
+plots_genesDE
+```
+
+### EG by COG24 Category
+
+Colors:
+
+-   Information Storage and Processing: Greens
+-   Cellular Processes and Signaling: Reds
+-   Metabolism: Blues
+
+```{r, fig.width=30, fig.height=10, fig.align="center"}
+EG_COG24_CATEGORY <- EG_data %>%
+  filter(Essentiality == "Reduced") %>%
+  separate_rows(func_COG24_CATEGORY, sep = "!!!") %>%
+  group_by(Condition, func_COG24_CATEGORY) %>%
+  summarize(count = n(), .groups = 'drop') 
+
+EG_COG24_CATEGORY <- left_join(EG_COG24_CATEGORY, COG_categories, by = "func_COG24_CATEGORY")
+EG_COG24_CATEGORY <- EG_COG24_CATEGORY %>%
+  mutate(
+    func_COG24_CATEGORY = factor(func_COG24_CATEGORY, levels = rev(COG_categories$func_COG24_CATEGORY)),
+    func_COG24_CATEGORY_SHORT = factor(func_COG24_CATEGORY_SHORT, levels = rev(COG_categories$func_COG24_CATEGORY_SHORT))
+  )
+
+plot_EG_COG24_CATEGORY <- ggplot(EG_COG24_CATEGORY %>% drop_na(func_COG24_CATEGORY)) +
+  facet_wrap( ~ Condition, ncol = 4) +
+  geom_bar(stat = "identity", position = "dodge", aes(x = func_COG24_CATEGORY_SHORT, y = count, fill = func_COG24_CATEGORY)) +
+  labs(y = "# Genes ", x = "") +
+  coord_flip() +
+  scale_fill_manual(values = color_mapping) +
+  scale_y_continuous(expand = c(0,0)) +
+  theme_bw(base_size = 30) +
+  theme(legend.position = "none",
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())   
+plot_EG_COG24_CATEGORY
+```
+
+### EG by KEGG Class
+
+```{r, fig.width=30, fig.height=10, fig.align="center"}
+EG_KEGG_Class <- EG_data %>%
+  filter(Essentiality == "Reduced") %>%
+  separate_rows(func_KEGG_Class, sep = "!!!") %>%
+  mutate(func_KEGG_Class = str_remove(func_KEGG_Class, "^Pathway modules; ")) %>%
+  mutate(func_KEGG_Class = str_remove(func_KEGG_Class, "^Signature modules; ")) %>%
+  mutate(func_KEGG_Class = str_remove(func_KEGG_Class, "^[^;]+; ")) %>%
+  group_by(Condition, func_KEGG_Class) %>%
+  summarize(count = n(), .groups = 'drop') 
+
+plot_EG_KEGG_Class <- ggplot(EG_KEGG_Class %>% drop_na(func_KEGG_Class)) +
+  facet_wrap( ~ Condition, ncol = 4) +
+  geom_bar(stat = "identity", position = "dodge", aes(x = func_KEGG_Class, y = count, fill = func_KEGG_Class)) +
+  labs(y = "# Genes ", x = "") +
+  coord_flip() +
+  scale_y_continuous(expand = c(0,0)) +
+  theme_bw(base_size = 30) +
+  theme(legend.position = "none",
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())   
+plot_EG_KEGG_Class
+```
+
+### EG by TIGRFAM Meta Role
+
+```{r, fig.width=30, fig.height=10, fig.align="center"}
+EG_TIGRFAM_MetaRole <- EG_data %>%
+  filter(Essentiality == "Reduced") %>%
+  separate_rows(`TIGRFAM Meta Role`, sep = ";") %>%
+  group_by(Condition, `TIGRFAM Meta Role`) %>%
+  summarize(count = n(), .groups = 'drop') 
+
+plot_EG_TIGRFAM_MetaRole <- ggplot(EG_TIGRFAM_MetaRole %>% drop_na(`TIGRFAM Meta Role`)) +
+  facet_wrap( ~ Condition, ncol = 4) +
+  geom_bar(stat = "identity", position = "dodge", aes(x = `TIGRFAM Meta Role`, y = count, fill = `TIGRFAM Meta Role`)) +
+  labs(y = "# Genes ", x = "") +
+  coord_flip() +
+  scale_y_continuous(expand = c(0,0)) +
+  theme_bw(base_size = 30) +
+  theme(legend.position = "none",
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())   
+plot_EG_TIGRFAM_MetaRole
+```
+
+## Log2FC Pair Plots
+
+### All Genes
+
+```{r}
+scatter_plot_by_pair <- function(data, pair_vals) {
+  # Filter and pivot data
+  pivoted_data <- data %>%
+    select(id, gene, func_prodigal, product, func_COG24_CATEGORY, func_KEGG_Class, `TIGRFAM Meta Role`, Condition, log2FC, Essentiality) %>%
+    filter(Condition %in% pair_vals) %>%
+    pivot_wider(names_from = Condition, values_from = c(log2FC, Essentiality)) %>%
+    mutate(across(starts_with("log2FC_"), ~ ., .names = "{sub('^log2FC_', '', .col)}")) %>%
+    select(-starts_with("log2FC_")) %>%
+    rowwise() %>%
+    mutate(selected = case_when(
+      all(c_across(starts_with("Essentiality_")) == "Reduced") ~ "Both",
+      all(c_across(starts_with("Essentiality_")) == "Unchanged") ~ "None",
+      TRUE ~ "One"
+    )) %>% 
+    mutate(selected = factor(selected,
+                              levels = c("One", "None", "Both")
+    )) %>% 
+    ungroup()
+  
+  pivoted_data_COG <- pivoted_data %>% 
+    separate_rows(func_COG24_CATEGORY, sep = "!!!")    
+  
+  pivoted_data_KEGG <- pivoted_data %>%
+    separate_rows(func_KEGG_Class, sep = "!!!") %>% 
+    mutate(func_KEGG_Class = sub(".*?; ", "", func_KEGG_Class))
+  
+  # Function to create scatter plots with different aesthetics
+  create_plot <- function(data, x, y, aes_params) {
+    ggplot(data, aes(x = !!sym(x), y = !!sym(y), !!!aes_params, 
+                     text1 = id, 
+                     text2 = gene, 
+                     text3 = func_prodigal,
+                     text4 = product,                 
+                     text5 = func_COG24_CATEGORY,                     
+                     text6 = func_KEGG_Class,
+                     text7 = `TIGRFAM Meta Role`)) +
+      geom_point(alpha = 0.7, size = 2) +
+      labs(x = paste("Log2FC for", x), y = paste("Log2FC for", y)) +
+      coord_fixed() +
+      geom_hline(yintercept = 0, color = "grey20") +
+      geom_vline(xintercept = 0, color = "grey20") +
+      geom_hline(yintercept = -2, color = "red", linetype = "dashed") +
+      geom_vline(xintercept = -2, color = "red", linetype = "dashed") +
+      theme_bw(base_size = 12) +
+      theme(legend.position = "top", panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+  }
+  
+  # Generate plots with different color variables
+  plot_select <- create_plot(pivoted_data, pair_vals[1], pair_vals[2], aes(color = selected)) +
+    scale_color_manual(values = c("skyblue", "grey", "red"))
+  plot_COG <- create_plot(pivoted_data_COG, pair_vals[1], pair_vals[2], aes(color = func_COG24_CATEGORY))
+  plot_KEEG <- create_plot(pivoted_data_KEGG, pair_vals[1], pair_vals[2], aes(color = func_KEGG_Class))
+    
+  # Interactive versions
+  plot_select_Int <- ggplotly(plot_select, tooltip = c("text1", "text2", "text3", "text4", "text5", "text6", "text7"))
+  plot_COG_Int <- ggplotly(plot_COG, tooltip = c("text1", "text2", "text3", "text4")) %>% 
+    layout(legend = list(font = list(size = 10)))
+  plot_KEEG_Int <- ggplotly(plot_KEEG, tooltip = c("text1", "text2", "text3", "text4")) %>% 
+    layout(legend = list(font = list(size = 10)))
+  
+  return(list(
+    plot_select = plot_select, 
+    plot_COG = plot_COG, 
+    plot_KEEG = plot_KEEG,
+    plot_select_Int = plot_select_Int,
+    plot_COG_Int = plot_COG_Int, 
+    plot_KEEG_Int = plot_KEEG_Int
+  ))
+}
+```
+
+```{r, fig.width=6, fig.height=6, fig.align="center", echo=FALSE}
+scatter_plot_by_pair(EG_data, c("LAC", "Input"))$plot_select_Int
+```
+
+### Plot with Highlighted Genes
+
+```{r}
+EG_data_wide <- EG_data_wide %>%
+  mutate(
+    plot_coloring = factor(
+      case_when(
+        genes.name %in% c("dat", "alr", "fmtA", "dltA", "dltB") ~ "condition1",
+        genes.name %in% c("dltD", "racE") ~ "condition2",
+        log2FC_diff_LAC_vs_Input >= -1.5 | Essentiality_LAC == "Unchanged" ~ "condition3",
+        TRUE ~ "condition4"
+      )
+    )
+  ) %>%
+  mutate( # Rename some genes
+    genes.name = case_when(
+      genes.name == "alr" ~ "alr1",
+      genes.name == "racE" ~ "murI",
+      TRUE ~ genes.name
+    )
+  )
+```
+
+```{r, fig.width=8, fig.height=6, fig.align="center"}
+plot <- ggplot() +
+  geom_point(data = EG_data_wide %>% filter(plot_coloring %in% c("condition3", "condition4")),
+             aes(x = log2FC_LAC, y = log2FC_Input, color = plot_coloring), alpha = 0.7, size = 2) +
+  geom_point(data = EG_data_wide %>% filter(plot_coloring %in% c("condition1", "condition2")),
+             aes(x = log2FC_LAC, y = log2FC_Input, color = plot_coloring), alpha = 0.7, size = 2) +
+  scale_color_manual(values = c("grey70", "steelblue", "firebrick", "black")) +
+  
+  geom_hline(yintercept = 0, color = "grey") +
+  geom_vline(xintercept = 0, color = "grey") +
+  geom_vline(xintercept = -2.08, color = "firebrick", linetype = "dashed", linewidth = 1) +
+  
+  geom_text(data = EG_data_wide %>% filter(plot_coloring %in% c("condition1", "condition2")),
+            aes(x = log2FC_LAC, y = log2FC_Input, label = genes.name), 
+            nudge_y = 0.55, nudge_x = 0.55, color = "black", size = 5) +
+  
+  coord_fixed(ratio = 1) +
+  labs(color = "Color Key", x = "log2FC normalized output from HNO-ALI", y = "log2FC normalized input library") +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 12)
+  )
+
+plot
+
+ggsave(filename = file.path(figures_folder, "Tn-Seq_log2FCInputLAC.png"), plot, width = 10, height = 6, dpi = 300)
+saveRDS(plot, file.path(figures_folder, "Tn-Seq_log2FCInputLAC.rds"))
+```
+
+
+
+## Enrichment Analysis
+
+We generated a custom protein interactions network in [STRING](https://string-db.org) using the **Staphylococcus aureus** subsp. **aureus** USA300_FPR3757 genome (RefSeq: NC_007793.1). The STRING organism ID for this genome is STRG0A72MUM, which can be found here:
+https://version-12-0.string-db.org/organism/STRG0A72MUM
+
+We generated a file with gene IDs and the `log2FC_diff_LAC_vs_Input` as input for STRING's "Proteins with Values/Ranks - Functional Enrichment Analysis".
+
+```{r}
+EG_data_STRING <- EG_data_wide %>%
+  select(id, log2FC_diff_LAC_vs_Input) 
+
+write_csv(EG_data_STRING, file.path(dataframes_folder, "TNSeq_5772_EG_log2FC_diff_LAC_vs_Input.csv")) # use this file for STRING enrichment analysis
+
+enrichment_data <- read.delim(file.path(dataframes_folder, "STRING_Enrichment.log2FC_diff_LAC_vs_Input.tsv"), header = TRUE, stringsAsFactors = FALSE) # read the enrichment results from STRING
+```
+
+```{r}
+plot_enrichment <- function(data, category, fdr_threshold = 0.05, top_n = 10, title = NULL) {
+  
+  df_plot <- data %>%
+    filter(X.category == category,
+           false.discovery.rate < fdr_threshold) %>%
+    arrange(-enrichment.score) %>%
+    head(top_n) %>%
+    mutate(
+      term.label = {
+        if (category == "STRING clusters") {
+          paste0(term.description, " (", term.ID, ")")
+        } else {
+          term.description
+        }
+      },
+      term.label = str_replace_all(
+        term.label,
+        c("biosynthetic process" = "biosynthesis",
+          "metabolic process" = "metabolism")
+      ),
+      term.label = str_wrap(term.label, width = 25),
+      term.label = fct_reorder(term.label, enrichment.score)
+    )
+  
+  plot <- ggplot(df_plot,aes(x = enrichment.score, y = term.label)) +
+    
+    geom_segment(aes(x = min(enrichment.score) * 0.92,   
+                     xend = enrichment.score,
+                     yend = term.label,
+                     colour = false.discovery.rate),
+                 linewidth = 1.2) +
+    
+    geom_point(aes(size   = genes.mapped, colour = false.discovery.rate)) +
+
+    scale_color_viridis_c(option = "C", begin = 0.2, end = 0.9, name  = "FDR") +
+    
+    scale_size_continuous(range  = c(2, 8),          
+                          breaks = c(10, 20, 40, 60),
+                          name   = "Gene count") +
+    
+    scale_x_continuous(expand = expansion(mult = c(0.02, 0.06))) +
+    
+    labs(title = title, x = "Enrichment score", y = NULL) +
+    
+    theme_bw(base_size = 10) +
+    theme(
+      plot.title       = element_text(hjust = 0.5, face = "bold", size = 14),
+      axis.text      = element_text(size = 10, colour = "black"),
+      axis.title.x     = element_text(size = 12, margin = margin(t = 8)),
+      panel.grid.major.x = element_line(colour = "grey80", linetype = "dashed"),
+      panel.grid.major.y = element_blank(),
+      panel.grid.minor   = element_blank(),
+      panel.border       = element_blank(),
+      axis.ticks = element_blank(),
+      legend.position    = "right",
+      legend.title       = element_text(size = 10),
+      legend.text        = element_text(size = 10),
+    )
+  
+  return(plot)
+}
+```
+
+```{r, fig.width=10, fig.height=5.5, fig.align="center"}
+plot_enrichment_GO_Process <- plot_enrichment(enrichment_data, "GO Process", fdr_threshold = 0.05, top_n = 10, title = "Biological Process (Gene Ontology) Enrichment")
+plot_enrichment_GO_Process
+
+ggsave(filename = file.path(figures_folder, "Tn-Seq_enrich_GO.png"), plot_enrichment_GO_Process, width = 10, height = 5.5, dpi = 300)
+saveRDS(plot_enrichment_GO_Process, file.path(figures_folder, "Tn-Seq_enrich_GO.rds"))
+```
+
+```{r, fig.width=10, fig.height=3.5, fig.align="center"}
+plot_enrichment_UniProt <- plot_enrichment(enrichment_data, "UniProt Keywords", fdr_threshold = 0.05, top_n = 10, title = "UniProt Enrichment")
+plot_enrichment_UniProt
+
+ggsave(filename = file.path(figures_folder, "Tn-Seq_enrich_UniProt.png"), plot_enrichment_UniProt, width = 10, height = 3.5, dpi = 300)
+saveRDS(plot_enrichment_UniProt, file.path(figures_folder, "Tn-Seq_enrich_UniProt.rds"))
+```
+
+```{r, fig.width=10, fig.height=8, fig.align="center"}
+plot_enrichment_STRING <- plot_enrichment(enrichment_data, "STRING clusters", fdr_threshold = 0.05, top_n = 10, title = "STRING Clusters Enrichment")
+plot_enrichment_STRING
+
+ggsave(filename = file.path(figures_folder, "Tn-Seq_enrich_STRING.png"), plot_enrichment_STRING, width = 10, height = 8, dpi = 300)
+saveRDS(plot_enrichment_STRING, file.path(figures_folder, "Tn-Seq_enrich_STRING.rds"))
+```
+

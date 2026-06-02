@@ -1,0 +1,52 @@
+---
+execute:
+  echo: true
+format:
+  html:
+    suppress-bibliography: true
+---
+
+# R Session Info {.unnumbered}
+
+This document lists all R packages used across analysis notebooks in this repository, and details how to reproduce or create similar analysis environments.
+
+## Package Loading
+
+```{r}
+#| warning: FALSE
+#| message: FALSE
+
+library(tidyverse)      # Data manipulation and ggplot2
+library(readxl)         # Reading Excel files
+library(ggtext)         # Enhanced text rendering in ggplot2
+library(scales)         # Scaling functions for ggplot2
+library(ggh4x)          # Extensions for ggplot2
+library(lme4)           # Linear mixed-effects models
+library(lmerTest)       # Tests for linear mixed-effects models
+library(emmeans)        # Estimated marginal means (EMMs) for linear models
+```
+
+## Session Information
+
+This shows the exact versions of R and all packages used in the analysis.
+
+```{r}
+sessionInfo()
+```
+
+## Reproducibility and Environment
+
+This repository manages R package versions using [`renv`](https://rstudio.github.io/renv/).
+
+To reproduce the environment for this project:
+
+If using a Windows computer, you must download Rtools45 to "make" packages. https://cran.r-project.org/bin/windows/Rtools/rtools45/rtools.html
+
+```{r}
+#renv::init() # Was used to create the initial renv environment and lockfile
+#renv::snapshot() # Was used to update the renv.lock file after installing new packages
+#renv::restore() # Restores the R environment based on the renv.lock file
+#renv::status() #check project status
+```
+
+This command uses the `renv.lock` file to install the exact package versions required for the analysis.

@@ -1,0 +1,476 @@
+---
+format:
+  html:
+    suppress-bibliography: true
+---
+
+# CFUs Competition {.unnumbered}
+
+```{r}
+# loading packages and functions
+library(tidyverse)
+library(kableExtra)
+library(ggtext)
+library(scales)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(ggh4x)
+library(broom)
+library(ggpubr)
+
+source("R/LMM_functions.R")
+```
+
+## Data Input 
+
+All data inputs and outputs in this repo are relative to **FOLDER_PATH**. Please, save the provided data frames in RDS format in the `dataframes` folder.
+
+```{r}
+# Load the BOX_PATH environment variable
+FOLDER_PATH <- Sys.getenv("BOX_PATH") 
+
+# Define subdirectories within the Box folder
+dataframes_folder <- file.path(FOLDER_PATH, "dataframes")
+
+outputs_folder <- file.path(FOLDER_PATH, "outputs/CFUs")
+if (!dir.exists(outputs_folder)) {
+  dir.create(outputs_folder, recursive = TRUE)
+}
+```
+
+
+
+```{r}
+# Read the provided RDS files
+dataframeID <- "DatCol"
+#Monocolonization CFU controls associated with competition experiments
+CFUs_HNO_Controls <- readRDS(file.path(dataframes_folder, paste0(dataframeID, "_CFUs_HNO_Controls.rds")))
+
+#Cocolonization CFU data
+CFUs_HNO_Competition <- readRDS(file.path(dataframes_folder, paste0(dataframeID, "_CFUs_HNO_Competition.rds")))
+
+# Filter the data for JE2 vs other parent strains
+CFUs_HNO_JE2 <- CFUs_HNO_Competition %>%
+  filter(str_detect(culture_pair, "_vs_JE2$"))
+
+CFUs_HNO_Other <- CFUs_HNO_Competition %>%
+  filter(!str_detect(culture_pair, "_vs_JE2$"))
+```
+
+## CFUs
+
+```{r}
+# Function to create a ggplot with jittered points, faceted by a variable, and customized aesthetics for fill and shape.
+plot_comp_function <- function(data, ymin_exp, ymax_exp, title_x = " ", title_y = " ",
+                          x_var, y_var, x_labels, fill_var, shape_var, facet_var, facet_labels,
+                          fill_colors, shape_leves, facet_colors, fill_title, shape_title) {
+  plot <- ggplot(data) +
+    geom_jitter(
+      aes(x = {{ x_var }}, y = {{ y_var }}, fill = {{ fill_var }}, shape = {{ shape_var }}),
+      size  = 4, stroke = 0.01, width = 0.2, color = "white") +
+    
+    facet_grid2(
+      rows = NULL, cols = vars({{ facet_var }}),
+      scales = "free_x", space = "free_x",
+      strip = strip_themed(background_x = elem_list_rect(fill = facet_colors)),
+      labeller = labeller(.cols = facet_labels)) +
+    
+    scale_fill_manual(values = fill_colors, name = fill_title) +
+    scale_shape_manual(values = shape_leves, name = shape_title) +
+    scale_x_discrete(labels = x_labels) +
+    
+    guides(
+      fill  = guide_legend(override.aes = list(shape = 21, color = "white", size = 3, stroke = 2)),
+      shape = guide_legend(override.aes = list(fill = "black", size = 3, stroke = 2))) +
+    
+    scale_y_log10(
+      limits = c(10^ymin_exp, 10^ymax_exp),
+      breaks = 10^(1:ymax_exp),
+      labels = trans_format("log10", math_format(10^.x))) +
+    labs(x = title_x, y = title_y) +
+    theme_bw() +
+    theme(
+      panel.grid    = element_blank(),
+      panel.spacing = unit(0, "lines"),
+      strip.text.x = element_markdown(size = 14, face = "bold", color = "black"),
+      text          = element_text(size = 16, color = "black"),
+      axis.text.x   = element_markdown(angle = 45, hjust = 1, color = "black"),
+      axis.text.y   = element_text(color = "black")
+    )
+  
+  return(plot)
+}
+```
+
+### Plot CFUs for JE2 
+
+```{r, fig.width=10, fig.height=6, fig.align="center"}
+plot_CFUs_Comp_JE2 <- plot_comp_function(
+  data        = CFUs_HNO_JE2,
+  x_var       = culture_pair, title_x = " ",
+  y_var       = CFU_HNO_byStrain, title_y = "CFUs/HNO-ALI", ymin_exp = NA, ymax_exp = 9,
+  fill_var    = strain, fill_colors = c("#5F05AF", "#2FD612", "#03C0FF", "#FC8EAC"), fill_title = "Strain",
+  shape_var   = line, shape_leves = c(21, 22), shape_title = "HNO line",
+  facet_var   = time, facet_colors = c("grey"), facet_labels = c("0" = "inoculum", "24" = "24 h on HNO-ALI"),
+  x_labels = c(
+    "dat_vs_JE2" = "<b><span style='color:#2FD612'><i>dat</i>::Tn</span> vs. <span style='color:#5F05AF'>parent</span></b>",
+    "alr1::Tn_vs_JE2" = "<b><span style='color:#03C0FF'><i>alr1</i>::Tn</span> vs. <span style='color:#5F05AF'>parent</span></b>",
+    "fmta::Tn_vs_JE2" = "<b><span style='color:#FC8EAC'><i>fmtA</i>::Tn</span> vs. <span style='color:#5F05AF'>parent</span></b>"
+  )
+)
+
+plot_CFUs_Comp_JE2
+
+# Save the plot
+ggsave(filename = file.path(outputs_folder, "HNO_CFUs_Comp_JE2.png"), plot = plot_CFUs_Comp_JE2, width = 10, height = 6, dpi = 300)
+saveRDS(plot_CFUs_Comp_JE2, file.path(outputs_folder, "HNO_CFUs_Comp_JE2.rds"))
+```
+
+```{r}
+# Calculate mean CFUs for each strain and culture pair at 24h, then create a data frame with all pairwise comparisons of these means, including fold change and log2 fold change.
+means_df_JE2 <- CFUs_HNO_JE2 %>%
+  filter(time != 0) %>%
+  group_by(strain, culture_pair) %>%
+  summarise(mean_CFU = mean(CFU_HNO_byStrain, na.rm = TRUE), .groups = "drop")
+
+pairs_df_JE2 <- crossing(
+  means_df_JE2 %>% rename(strain1 = strain, culture_pair1 = culture_pair, mean1 = mean_CFU),
+  means_df_JE2 %>% rename(strain2 = strain, culture_pair2 = culture_pair, mean2 = mean_CFU)
+) 
+
+pairs_df_JE2 <- pairs_df_JE2 %>%
+  filter(!(strain1 == strain2 & culture_pair1 == culture_pair2)) %>%
+  filter(
+    # Keep all comparisons where JE2 is NOT involved
+    !(strain1 == "JE2" | strain2 == "JE2") |
+      
+      # If JE2 IS involved, only keep comparisons within the same culture_pair
+      (strain1 == "JE2" | strain2 == "JE2") & (culture_pair1 == culture_pair2)
+  )
+
+pairs_df_JE2 <- pairs_df_JE2 %>%
+  mutate(
+    FC = mean1 / mean2,
+    log2FC = log2(FC)
+  )
+
+kable(
+  pairs_df_JE2 %>%
+    mutate(across(where(is.numeric), ~ format(.x, scientific = FALSE)))
+)
+```
+
+### Plot CFUs for other parent strains
+
+```{r, fig.width=10, fig.height=6, fig.align="center"}
+plot_CFUs_Comp_Other <- plot_comp_function(
+  data        = CFUs_HNO_Other,
+  x_var       = culture_pair, title_x = " ",
+  y_var       = CFU_HNO_byStrain, title_y = "CFUs/HNO-ALI", ymin_exp = NA, ymax_exp = 9,
+  fill_var    = strain, fill_colors = c("#5F05AF", "#2FD612", "#03C0FF","#5F05AF", "#2FD612", "#5F05AF", "#2FD612"), fill_title = "Strain",
+  shape_var   = line, shape_leves = c(21, 22), shape_title = "HNO line",
+  facet_var   = time, facet_colors = c("grey"), facet_labels = c("0" = "inoculum", "16" = "16 h on HNO-ALI", "24" = "24 h"),
+  x_labels = c(
+    "dat::Tn_vs_502a" = "<b><span style='color:#2FD612'><i>dat</i>::Tn</span> vs. <span style='color:#5F05AF'>502A</span> (CC8)</b>",
+    "alr1::Tn_vs_502a" = "<b><span style='color:#03C0FF'><i>alr1</i>::Tn</span> vs. <span style='color:#5F05AF'>502A</span> (CC8)</b>",
+    "dat::Tn_vs_KPL2715" = "<b><span style='color:#2FD612'><i>dat</i>::Tn</span> vs. <span style='color:#5F05AF'>KPL2715</span> (CC30)</b>",
+    "dat::Tn_vs_KPL4559" = "<b><span style='color:#2FD612'><i>dat</i>::Tn</span> vs. <span style='color:#5F05AF'>AH2623</span> (CC5)</b>"
+  )
+)
+
+plot_CFUs_Comp_Other
+
+# Save the plot
+ggsave(filename = file.path(outputs_folder, "HNO_CFUs_Comp_Other.png"), plot = plot_CFUs_Comp_Other, width = 10, height = 6, dpi = 300)
+saveRDS(plot_CFUs_Comp_Other, file.path(outputs_folder, "HNO_CFUs_Comp_Other.rds"))
+```
+
+```{r}
+# Calculate mean CFUs for each strain and culture pair at 16/24h, then create a data frame with all pairwise comparisons of these means, including fold change and log2 fold change.
+means_df_Other <- CFUs_HNO_Other %>%
+  filter(time != 0) %>%
+  group_by(strain, culture_pair) %>%
+  summarise(mean_CFU = mean(CFU_HNO_byStrain, na.rm = TRUE), .groups = "drop")
+
+pairs_df_Other <- crossing(
+  means_df_Other %>% rename(strain1 = strain, culture_pair1 = culture_pair, mean1 = mean_CFU),
+  means_df_Other %>% rename(strain2 = strain, culture_pair2 = culture_pair, mean2 = mean_CFU)
+)
+
+pairs_df_Other <- pairs_df_Other %>%
+  mutate(
+    fold_change = mean1 / mean2,
+    log2FC = log2(fold_change)
+  )
+
+kable(
+  pairs_df_Other %>%
+    mutate(across(where(is.numeric), ~ format(.x, scientific = FALSE)))
+)
+```
+
+## Competition Index (CI)
+
+Competition indices (CI = (mutant output / parent output) / (mutant input / parent input)) were calculated for each culture pair, where output is the CFU/HNO-ALI at the endpoint and input is the CFU/HNO-ALI at the inoculum.
+
+```{r}
+# Function to create a ggplot with jittered points, emmeans predictions with error bars, and a dashed line at y=1.
+plot_CI_function <- function(formated_stats_results, ymin_exp, ymax_exp, title_x = " ", title_y = " ",
+                             x_var, y_var, x_labels, fill_var, shape_var, facet_var,
+                             fill_colors, shape_leves, fill_title, shape_title) {
+  
+  annot <- formated_stats_results$main %>%
+    filter(sign == "*") %>%
+    mutate(sign = "")
+
+  plot <- ggplot(data = formated_stats_results$input_data) +
+    geom_hline(yintercept = 1, linetype = "dashed", color = "#5F05AF", linewidth = 0.8) +
+    geom_jitter(
+      aes(x = {{ x_var }}, y = {{ y_var }}, fill = {{ fill_var }}, shape = {{ shape_var }}),
+      size  = 4, stroke = 0.01, width = 0.2, color = "white") +
+    
+    geom_point(data = formated_stats_results$predictions, aes(x = {{ x_var }}, y = predicted_mean), shape = 3, size = 1) +
+    geom_errorbar(data = formated_stats_results$predictions, aes(x = {{ x_var }},
+                                                                 y = predicted_mean,
+                                                                 ymin = predicted_lower,
+                                                                 ymax = predicted_upper),
+                  width = .15) +
+    
+    scale_fill_manual(values = fill_colors, name = fill_title) +
+    scale_shape_manual(values = shape_leves, name = shape_title) +
+    scale_x_discrete(labels = x_labels) +
+    
+    guides(
+      fill  = guide_legend(override.aes = list(shape = 21, color = "white", size = 3, stroke = 2)),
+      shape = guide_legend(override.aes = list(fill = "black", size = 3, stroke = 2))) +
+    
+    scale_y_log10(
+      breaks = 10^(ymin_exp:ymax_exp),
+      labels = trans_format("log10", math_format(10^.x))) +
+    
+    labs(x = title_x, y = title_y) +
+    theme_bw() +
+    theme(
+      panel.grid    = element_blank(),
+      text          = element_text(size = 16, color = "black"),
+      axis.text.x   = element_markdown(angle = 45, hjust = 1, color = "black"),
+      axis.text.y   = element_text(color = "black")
+    )
+  
+  if (nrow(annot) > 0) {
+    plot <- plot +
+      stat_pvalue_manual(annot, label = "sign", y.position = ymax_exp, 
+                         step.increase = 0.04, tip.length = 0.01, bracket.shorten = 0.2, vjust = 0.6, bracket.size = 0.5) 
+  }
+  
+  return(plot)
+}
+```
+
+### CI for JE2
+
+Log-transformed CI were compared using a LMM to determine statistical significance with `culture_pair` as fixed effect and experimental date as a random effect (line was singular). 
+All pairwise contrasts were performed and adjusted for multiple comparisons using the Holm method. A `sign` annotation column was created to indicate which comparisons are statistically significant with p<0.05.
+Vertical brackets represent model-predicted mean values and confidence intervals (± 2 × SEM), back-transformed to the original response scale. 
+
+```{r}
+# Calculate Competition Index (CI) for JE2 
+CFUs_HNO_JE2_CI <- CFUs_HNO_JE2 %>%
+  mutate(type = if_else(strain == "JE2", "parent", "mutant")) %>%
+  select(date, line, CC,culture_pair, type, time, CFU_HNO_byStrain) %>%
+  group_by(date, culture_pair) %>%
+  
+  # pivot within each date × culture_pair group
+  pivot_wider(
+    names_from = c(type, time),
+    values_from = CFU_HNO_byStrain
+  ) %>%
+  
+  # compute CI 
+  mutate(CI = (mutant_24 / parent_24) / (mutant_0 / parent_0)) %>%
+  ungroup() 
+```
+
+```{r}
+# Run the mixed model with emmeans contrasts for the JE2 dataset.
+stats_results_JE2 <- mixed_model_with_emmeans(
+  input_data = CFUs_HNO_JE2_CI, response = "CI", log_response = TRUE, adjust = "holm",
+  fixed_effects = c("culture_pair"), random_effects1 = "line", random_effects2 = "date"
+)
+stats_formated_JE2 <- format_stats_results(stats_results_JE2)
+```
+
+```{r}
+# Render the results
+cat("Model Formula:", format(stats_results_JE2$model_formula))
+kable(stats_formated_JE2$random_effects, caption = "Random Effects")
+kable(stats_formated_JE2$anova, caption = "ANOVA Table")
+kable(stats_formated_JE2$main %>%
+    mutate(
+      p.value.anova = formatC(p.value.anova, format = "e", digits = 2),
+      p.value = formatC(p.value, format = "e", digits = 2)
+    ) %>%
+    select(effect_name, p.value.anova,  condition1, condition2, predicted_mean.1, predicted_mean.2, FC, log2FC, p.value, sign),
+  caption = "Main Contrasts with Predicted Log2FC"
+)
+```
+
+```{r, fig.width=10, fig.height=6, fig.align="center"}
+plot_CI_JE2 <- plot_CI_function(
+  formated_stats_results = stats_formated_JE2,
+  x_var       = culture_pair, title_x = " ",
+  y_var       = CI, title_y = "Competition Index (CI)", ymin_exp = -4, ymax_exp = 0.1,
+  fill_var    = culture_pair, fill_colors = c("#2FD612", "#03C0FF", "#FC8EAC"), fill_title = "Strain",
+  shape_var   = line, shape_leves = c(21, 22), shape_title = "HNO line",
+  x_labels = c(
+    "dat_vs_JE2" = "<b><span style='color:#2FD612'><i>dat</i>::Tn</span> vs. <span style='color:#5F05AF'>parent</span></b>",
+    "alr1::Tn_vs_JE2" = "<b><span style='color:#03C0FF'><i>alr1</i>::Tn</span> vs. <span style='color:#5F05AF'>parent</span></b>",
+    "fmta::Tn_vs_JE2" = "<b><span style='color:#FC8EAC'><i>fmtA</i>::Tn</span> vs. <span style='color:#5F05AF'>parent</span></b>"
+  )
+)
+
+plot_CI_JE2
+
+# Save the plot
+ggsave(filename = file.path(outputs_folder, "HNO_CI_JE2.png"), plot = plot_CI_JE2, width = 10, height = 6, dpi = 300)
+saveRDS(plot_CI_JE2, file.path(outputs_folder, "HNO_CI_JE2.rds"))
+```
+
+A one-sample t-test was used to determine whether the CI for each mutant was significantly lower than 1, where 1 indicates the same fitness as the parental strain (purple dashed line). Holm adjustment was used to adjust p-values for multiple tests.
+```{r}
+# Run one sample T test comparing to 1 for each culture pair
+CI.tTest_JE2 <- CFUs_HNO_JE2_CI %>%
+  group_by(culture_pair) %>%
+  summarise(
+    test = list(tidy(t.test(log(CI), mu = 1)))
+  ) %>%
+  unnest(test) %>%
+  mutate(p.adj = p.adjust(p.value, method = "holm"),
+         sign = case_when(p.adj < 0.05 ~ "*", TRUE ~ ""))
+
+kable(CI.tTest_JE2 %>%
+        mutate(p.value = formatC(p.value, format = "e", digits = 2),
+               p.adj = formatC(p.adj, format = "e", digits = 2))
+)
+
+# Save the stats results
+stats_formated_JE2$tTest <- CI.tTest_JE2
+saveRDS(stats_formated_JE2, file.path(outputs_folder, "stats_results_HNO_CI_JE2.rds"))
+```
+
+### CI for other parent strains
+
+Log-transformed CI were compared using a LMM to determine statistical significance with `culture_pair` as fixed effect and experimental date and line as random effects (line was singular).
+We analyzed pairwise contrasts comparing only between mutants from the same parent strain.
+We then adjusted the p-values for multiple comparisons using the Holm method and created a `sign` annotation column to indicate which comparisons are statistically significant with p<0.05.
+Vertical brackets represent model-predicted mean values and confidence intervals (± 2 × SEM), back-transformed to the original response scale.
+
+```{r}
+# Calculate Competition Index (CI) for other parent strains
+CFUs_HNO_Other_CI <- CFUs_HNO_Other %>%
+  mutate(type = if_else(!str_detect(strain, "_"), "parent", "mutant")) %>%
+  select(date, line, culture_pair, type, CC, time, CFU_HNO_byStrain) %>%
+  group_by(date, culture_pair) %>%
+  
+  # pivot within each date × culture_pair group
+  pivot_wider(
+    names_from = c(type, time),
+    values_from = CFU_HNO_byStrain
+  ) %>%
+  # compute CI 
+  mutate(
+    CI = coalesce(
+      (mutant_24 / parent_24) / (mutant_0 / parent_0),
+      (mutant_16 / parent_16) / (mutant_0 / parent_0)
+    )
+  ) %>%
+  ungroup()
+```
+
+```{r}
+# Run the mixed model with emmeans contrasts for the JE2 dataset.
+stats_results_Other <- mixed_model_with_emmeans(
+  input_data = CFUs_HNO_Other_CI, response = "CI", log_response = TRUE, adjust = "none",
+  fixed_effects = c("culture_pair"), random_effects1 = "line", random_effects2 = "date"
+)
+stats_formated_Other <- format_stats_results(stats_results_Other)
+
+# Filter the contrasts to only include those comparing between the same parent strain.
+# Pvalues are adjusted using the Holm method only for the contrasts that are being kept and the significance annotation is added accordingly.
+stats_formated_Other$main <- stats_formated_Other$main %>%
+  filter(sub(".*_vs_", "", condition1) == sub(".*_vs_", "", condition2)) %>%
+  mutate(
+    p.value.adj = p.adjust(p.value, method = "holm"),
+    sign = case_when(p.value.adj < 0.05 ~ "*", TRUE ~ "")
+  )
+```
+
+```{r}
+# Render the results
+cat("Model Formula:", format(stats_results_Other$model_formula))
+kable(stats_formated_Other$random_effects, caption = "Random Effects")
+kable(stats_formated_Other$anova, caption = "ANOVA Table")
+kable(stats_formated_Other$main %>%
+    mutate(
+      p.value.anova = formatC(p.value.anova, format = "e", digits = 2),
+      p.value = formatC(p.value, format = "e", digits = 2),
+      p.value.adj = formatC(p.value.adj, format = "e", digits = 2)
+    )  %>%
+    select(effect_name, p.value.anova,  condition1, condition2, predicted_mean.1, predicted_mean.2, FC, log2FC, p.value, p.value.adj, sign),
+  caption = "Main Contrasts with Predicted Log2FC"
+)
+```
+
+```{r, fig.width=10, fig.height=6, fig.align="center"}
+plot_CI_Other <- plot_CI_function(
+  formated_stats_results = stats_formated_Other,
+  x_var       = culture_pair, title_x = " ",
+  y_var       = CI, title_y = "Competition Index (CI)", ymin_exp = -5, ymax_exp = 0.1,
+  fill_var    = culture_pair, fill_colors = c("#2FD612", "#03C0FF", "#2FD612", "#2FD612"), fill_title = "Strain",
+  shape_var   = line, shape_leves = c(21, 22), shape_title = "HNO line",
+  x_labels = c(
+    "dat::Tn_vs_502a" = "<b><span style='color:#2FD612'><i>dat</i>::Tn</span> vs. <span style='color:#5F05AF'>502A</span></b>",
+    "alr1::Tn_vs_502a" = "<b><span style='color:#03C0FF'><i>alr1</i>::Tn</span> vs. <span style='color:#5F05AF'>502A</span></b>",
+    "dat::Tn_vs_KPL2715" = "<b><span style='color:#2FD612'><i>dat</i>::Tn</span> vs. <span style='color:#5F05AF'>KPL2715</span></b>",
+    "dat::Tn_vs_KPL4559" = "<b><span style='color:#2FD612'><i>dat</i>::Tn</span> vs. <span style='color:#5F05AF'>AH2623</span></b>"
+  )
+)
+
+plot_CI_Other <- plot_CI_Other +
+  geom_vline(xintercept = c(2.5, 3.5), color = "grey70", linewidth = 0.5) +
+  annotate("text", x = 1.5, y = Inf, label = "CC8", vjust = -0.5, fontface = "bold") +
+  annotate("text", x = 3.0, y = Inf, label = "CC30", vjust = -0.5, fontface = "bold") +
+  annotate("text", x = 4, y = Inf, label = "CC5", vjust = -0.5, fontface = "bold") +
+  coord_cartesian(clip = "off") +   
+  theme(plot.margin = margin(t = 30))
+
+plot_CI_Other
+
+# Save the plot
+ggsave(filename = file.path(outputs_folder, "HNO_CI_Other.png"), plot = plot_CI_Other, width = 10, height = 6, dpi = 300)
+saveRDS(plot_CI_Other, file.path(outputs_folder, "HNO_CI_Other.rds"))
+```
+
+A one-sample t-test was used to determine whether the CI for each mutant was significantly lower than 1, where 1 indicates the same fitness as the parental strain (purple dashed line). Holm adjustment was used to adjust p-values for multiple tests.
+```{r}
+# Run one sample T test comparing to 1 for each culture pair
+CI.tTest_Other <- CFUs_HNO_Other_CI %>%
+  group_by(culture_pair) %>%
+  summarise(
+    test = list(tidy(t.test(log(CI), mu = 1)))
+  ) %>%
+  unnest(test) %>%
+  mutate(p.adj = p.adjust(p.value, method = "holm"),
+         sign = case_when(p.adj < 0.05 ~ "*", TRUE ~ ""))
+
+kable(CI.tTest_Other %>%
+        mutate(p.value = formatC(p.value, format = "e", digits = 2),
+               p.adj = formatC(p.adj, format = "e", digits = 2))
+)
+
+# Save the stats results
+stats_formated_Other$tTest <- CI.tTest_Other
+saveRDS(stats_formated_Other, file.path(outputs_folder, "stats_results_HNO_CI_Other.rds"))
+```
+

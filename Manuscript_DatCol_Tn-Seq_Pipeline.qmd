@@ -1,0 +1,384 @@
+---
+execute:
+  eval: false
+  echo: true
+format:
+  html:
+    suppress-bibliography: true
+---
+
+# Tn-Seq Pipeline {.unnumbered .unlisted}
+
+```{r}
+library(tidyverse)
+library(Biostrings)
+library(DESeq2)
+library(mclust)
+```
+
+This pipeline is based on previously work published by Dr. Ibberson's [@lewin2019; @ibberson2017]. The code in this notebook is adapted with some modifications to fit our data and analysis needs. The original resources can be found here:
+
+-   [Generating a TA sites file](https://ibberson-lab.slab.com/public/posts/generating-a-ta-sites-file-8zr5148f)
+-   [Tn-seq Mapping](https://ibberson-lab.slab.com/public/posts/tn-seq-mapping-4kwo7evd)
+-   [Essential Gene Analysis](https://ibberson-lab.slab.com/public/posts/essential-gene-analysis-qsa5i4y1)
+-   Additional scripts can be found [here](https://github.com/glew8/Tn-seq_co-infection_analyses), including some dependency scripts like the TnGeneBin.pl script for binning reads into genes as part of the essential gene analysis.
+
+```{r}
+FOLDER_PATH <- Sys.getenv("BOX_PATH")
+TnSeq_folder <- file.path(FOLDER_PATH, "Tn-Seq")
+```
+
+## Reference genome and TA sites
+
+We used *Staphylococcus aureus subsp. aureus* USA300_FPR3757 [GCF_000013465.1](https://www.ncbi.nlm.nih.gov/assembly/GCF_000013465.1/) as reference genome. The assembly was downloaded from NCBI on 12/21/23. Curated versions of the assembly were manually created containing only the main chromosome **NC_007793.1** (the 3 plasmids were removed) and saved as **Sau_USA300_FPR3757.fasta** and **Sau_USA300_FPR3757.gff** in `data/TnSeq/RefSeqs`.
+
+```{r}
+gff_pfx = "Sau_USA300_FPR3757"
+gff_dir = file.path(TnSeq_folder, "RefSeqs/Sau_USA300_FPR3757.gff")
+genome_dir <- file.path(TnSeq_folder,"RefSeqs/Sau_USA300_FPR3757.fasta")
+```
+
+**Sau_USA300_FPR3757.fasta** was indexed for use with bowtie2 later in the pipeline
+
+```{bash, eval=FALSE}
+#conda activate Tn-Seq
+bowtie2-build data/TnSeq/RefSeqs/Sau_USA300_FPR3757.fasta data/TnSeq/RefSeqs/USA300
+```
+
+For Mariner transposons, which only insert in TA sites, it is beneficial to identify all of the TA sites and restrict to these sites for downstream analysis. To generate a .csv file of all of the TA sites in a genome, the following code was used:
+
+```{r}
+genome <- readDNAStringSet(genome_dir)
+ta_sites <- vmatchPattern("TA", genome)
+ta_vect <- unname(unlist(start(ta_sites)))
+ta_df <- data_frame(sites = ta_vect)
+write.csv(ta_df$sites, file.path(TnSeq_folder, "RefSeqs/Sau_USA300_FPR3757_TAsites.csv"))
+```
+
+## Tn-seq Mapping
+
+This section is based in the [TnSeq2.sh](https://ibberson-lab.slab.com/public/posts/tn-seq-mapping-4kwo7evd) script. This section processes the raw fastq files, maps the reads to the reference genome, and tallies the mapping results to identify insertion sites and read counts per site.
+
+```{bash, eval=FALSE}
+myPath="data/TnSeq/"
+
+mkdir -p $myPath/logs
+mkdir -p $myPath/bam
+mkdir -p $myPath/sites
+mkdir -p $myPath/genes
+
+for file in $myPath/fastq/*.fastq.gz; do
+    PREFIX=`basename ${file%.*.*}`
+    echo "Initializing TnSeq analysis on $PREFIX"
+    echo "TnSeq processing stats for $PREFIX" > $myPath/logs/$PREFIX-TnSeq.txt
+    echo "Number of raw reads: " >> $myPath/logs/$PREFIX-TnSeq.txt
+    zcat $file | grep -c '^@' >> $myPath/logs/$PREFIX-TnSeq.txt
+done
+```
+
+### Trimming of IRs & Adaptors
+
+This code chunk removes adapters by removing every sequence before the IR sequence using cutadapt [@martin2011]. The number of reads post-trimming is logged for each sample. The `-m 20` option ensures that only reads of at least 20 bp after trimming are retained, which helps to filter out very short reads that may not be informative for mapping.
+
+```{bash, eval=FALSE}
+myPath="data/TnSeq/"
+
+#conda activate Tn-Seq
+IR="GCCAACCTGTTA"
+
+for file in $myPath/fastq/*.fastq.gz; do
+    PREFIX=`basename ${file%.*.*}`
+    echo "$PREFIX: Removing primer and IR sequences..."
+    cutadapt -g $IR -m 20 --discard-untrimmed -o $myPath/fastq/$PREFIX.trim.fastq $file > $myPath/logs/$PREFIX.cutadapt_log.txt
+    echo "Number of post-trimmed reads: " >> $myPath/logs/$PREFIX-TnSeq.txt
+    grep -c '^@' $myPath/fastq/$PREFIX.trim.fastq >> $myPath/logs/$PREFIX-TnSeq.txt
+done
+
+```
+
+Some of the samples were resequenced, so we had to concatenate the trim files for the original and resequenced samples before moving forward with the analysis.
+
+```{bash}
+myPath="data/TnSeq/"
+
+cd $myPath/fastq
+cat 5772_021_S19_R1_001.trim.fastq 5772_021reseq_S1_R1_001.trim.fastq > 5772_021_S01_R1_001.trim.fastq
+cat 5772_022_S20_R1_001.trim.fastq 5772_022reseq_S2_R1_001.trim.fastq > 5772_022_S00_R1_001.trim.fastq
+cat 5772_027_S1_R1_001.trim.fastq 5772_027_S61_R1_001.trim.fastq > 5772_027_S00_R1_001.trim.fastq
+```
+
+### Mapping to reference genome
+
+This code chunk maps the reads to the reference genome using Bowtie2 [@Langmead2012; @Langmead2019] and processes the resulting SAM files with samtools [@Danecek2021] to generate sorted BAM files containing only mapped, primary alignments. The mapping report from Bowtie2 and the number of mapped reads are logged for each sample.
+
+```{bash, eval=FALSE}
+myPath="data/TnSeq/"
+GENOME=$myPath"RefSeqs/USA300"
+
+#conda activate Tn-Seq
+
+for file in $myPath/fastq/*.trim.fastq; do
+    PREFIX=`basename ${file%.*.*}`
+    echo "$PREFIX: Mapping with Bowtie2..."
+    echo "Bowtie2 report:" >> $myPath/logs/$PREFIX-TnSeq.txt
+    bowtie2 --end-to-end -p 16 -a -x $GENOME -U $myPath/fastq/$PREFIX.trim.fastq 2>> $myPath/logs/$PREFIX-TnSeq.txt | \
+    samtools view -b -F 4 -F 2048 | samtools sort -@ 16 -o $myPath/bam/$PREFIX-mapped.bam
+    echo "Number of mapped reads:" >> $myPath/logs/$PREFIX-TnSeq.txt
+    samtools view -c $myPath/bam/$PREFIX-mapped.bam >> $myPath/logs/$PREFIX-TnSeq.txt
+done
+```
+
+### Tallying mapping results
+
+This code chunk processes the mapped BAM files to identify unique insertion sites and count the number of reads mapping to each site. The results are saved in text files for each sample, and summary statistics about the number of insertion sites and the most frequent sites are logged.
+
+```{bash, eval=FALSE}
+myPath="data/TnSeq/"
+
+#conda activate Tn-Seq
+
+for file in $myPath/fastq/*.trim.fastq; do
+    PREFIX=`basename ${file%.*.*}`
+    echo "$PREFIX: Tallying mapping results..."
+    samtools view -F 256 $myPath/bam/$PREFIX-mapped.bam | \
+        awk '{if(($2) != 16) print $4; else print $4+length($10)}' | \
+        sort | uniq -c | sort -k1nr \
+        > $myPath/sites/$PREFIX-sites.txt
+    echo "Number of insertion sites identified:" >> $myPath/logs/$PREFIX-TnSeq.txt
+    wc -l $myPath/sites/$PREFIX-sites.txt >> $myPath/logs/$PREFIX-TnSeq.txt
+    echo "Most frequent sites:" >> $myPath/logs/$PREFIX-TnSeq.txt
+    head -10 $myPath/sites/$PREFIX-sites.txt >> $myPath/logs/$PREFIX-TnSeq.txt
+done
+```
+
+## Essential Gene Analysis
+
+This section is based on the [Essential Gene Analysis](https://ibberson-lab.slab.com/public/posts/essential-gene-analysis-qsa5i4y1) script. The code in this section reads in the site counts generated in the previous section, generates expected datasets with the same number of sites and reads, bins the sites into genes using the `TnGeneBin.pl` script, and performs DESeq2 analysis to identify essential genes.
+
+### Counting reads per site and generating expected datasets
+
+We manually made subfolders to separates the sites files for each sample type (input and lac) so that we could run the following code separately for each sample type. The code chunk below is where you select which sample type to run the analysis on. You will need to update the `ctrl_pfx` variable based on the sample type you are running (e.g. "input" or "lac") as this is used in the naming of output files and summary stats.
+
+```{r}
+# Run this code chunk separately for each sample type, updating the mydata and ctrl_pfx variables accordingly
+mydata <- file.path(TnSeq_folder, "sites/sites_input")
+ctrl_pfx = paste(gff_pfx, "input", sep = "_") #update name based on sample type
+
+#mydata <- file.path(TnSeq_folder, "sites/sites_lac")
+#ctrl_pfx = paste(gff_pfx, "lac", sep = "_") #update name based on sample type
+```
+
+This code chunk reads in the site counts for each sample, generates expected datasets with the same number of sites and reads, and outputs the read counts per site and gene boundaries for the binning script. It also outputs summary statistics about the number of sites and reads to a text file.
+
+```{r}
+filenames <- dir(mydata, pattern = ".*-sites.txt", full.names = TRUE)
+conditions <- sub("-sites.txt", "", filenames)
+
+ctrl_reps = length(filenames)
+num_expected = 100
+out_pfx = paste(ctrl_pfx, "EssentialGenes_100", sep = "_")
+to_trim = 0
+
+# create summary stats file to record summary info
+
+write(out_pfx, file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""))
+write(paste( "\n", "input files:", sep = ""), file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""), append = TRUE)
+write(filenames, file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""), append = TRUE)
+write(paste( "\n", "gff: ", gff_pfx, sep = ""), file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""), append = TRUE)
+write(paste("\n", "to trim: ", to_trim, sep = ""), file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""), append = TRUE)
+write(paste("number of expected datasets: ", num_expected, sep = ""), file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""), append = TRUE)
+
+# Read in sites files
+        sites <- data.frame(Pos = c(0)) 
+        for (i in 1:length(conditions)) {
+                newsites <- read.table(paste(paste(conditions[i], sep = "/"), "sites.txt", sep = "-")) 
+                colnames(newsites) <- c(paste("V", i, sep = ""), "Pos")
+                newsites <- arrange(newsites,Pos)
+                sites <- merge(sites, newsites, all = T) 
+        }
+        sites <- tail(sites, n = -1)
+        sites[is.na(sites)] <- 0
+
+        #output number of total and shared sites across samples. Need to edit based on number of samples.
+        sites_total <- sites %>% mutate(numreps = (V1 > 0) + (V2 > 0)) %>% filter(numreps >= 1)
+        write(paste("number of sites:", nrow(sites_total)), file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""), append = TRUE)
+        sites_shared <- sites %>% mutate(numreps = (V1 > 0) + (V2 > 0)) %>% filter(numreps >= 2)
+        write(paste("number of sites shared by all samples:", nrow(sites_shared)), file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""), append = TRUE)
+
+        # Normalize data by reads/site
+        colData <- data.frame(c(rep(ctrl_pfx, ctrl_reps)), condition = rep("treated", ctrl_reps))
+        sitescds <- sites[,2:length(sites)] %>% round %>% DESeqDataSetFromMatrix(colData = colData, design = ~ 1)
+        sitescds <- estimateSizeFactors(sitescds)
+        #Output the normalized counts
+        counts.norm <- counts(sitescds, normalized = F)
+        rownames(counts.norm) <- sites$Pos
+
+        # Initialize the list of genes, determine genome length
+        #can add column names if your gff has extra columns
+        gff <- read.delim(gff_dir, sep = "\t", fill = TRUE, skip = 9, header = FALSE, col.names = c("seqname", "source", "feature", "start", "end", "score", "strand", "frame", "att"))
+        #change this value if your gff file contains anything besides genes that you want to read in
+        gff <- gff[(gff$feature == "gene"),]
+
+        # Initialize read counts per gene and number of independent Tn sites per gene
+        # Generate pseudo-datasets with the same number of insertion sites and total reads mapping to those sites, randomly distributed across the genome
+        counts.df <- data.frame(counts.norm)
+        counts.df$Pos <- as.numeric(rownames(counts.df))
+        numreads <- sum(counts.norm)/ctrl_reps
+        numsites <- length(which(counts.norm > 0))/ctrl_reps
+        
+        #generates a new sites data frame and calculates the mean counts for each site in a new column. This column (containing the mean) is then used to sample from to generate the expected datasets.
+        sites2 <- sites[2:(ctrl_reps + 1)]
+        sites2$mean <- rowMeans(sites2) %>% round
+
+        #For mariner transposon, define Possible_sites
+        Possible_sites <- read_csv(paste0(TnSeq_folder, "/RefSeqs/Sau_USA300_FPR3757_TAsites.csv"), col_types = cols(...1 = col_skip())) #only need to do if mariner transposon
+        colnames(Possible_sites) = c("sites")
+
+        #compute expected dataset
+        for (i in 1:num_expected) {
+          expected <- data.frame(Pos = sample(Possible_sites$sites, numsites), Exp = sample(sites2$mean, numsites)) %>% arrange(Pos) 
+                colnames(expected)[2] <- paste("Expected", i, sep = ".")
+                counts.df <- merge(counts.df, expected, by = "Pos", all = T) %>% arrange(Pos)
+                counts.df[is.na(counts.df)] <- 0
+        }
+        rownames(counts.df) <- counts.df$Pos
+        counts.norm <- as.matrix(counts.df[,(2:length(counts.df))])
+        
+        write(paste("\n", "numreads: ", numreads, sep = ""), file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""), append = TRUE)
+        write(paste("numsites: ", numsites, sep = ""), file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""), append = TRUE)
+
+        # Initialize the lists of read counts per gene and number of independent Tn sites per gene
+        controlreps <- 0
+        expreps <- 0
+        for (c in 1:length(counts.norm[1,])) {
+                gff[,c + 9] <- rep(1,length(gff[,1]))
+                if (controlreps < ctrl_reps) {
+                        controlreps <- controlreps + 1
+                        colnames(gff)[c + 9] <- paste(ctrl_pfx, controlreps, sep = ".")
+                }
+                else {
+                        expreps <- expreps + 1
+                        colnames(gff)[c + 9] <- paste("Expected", expreps, sep = ".")
+                }
+        }
+
+        # Output gene boundaries and read counts per Tn site for Perl binning script
+        boundariesfile <- paste(mydata, "/", paste(out_pfx, ".boundaries.tsv", sep = ""), sep = "")
+        sitecountsfile <- paste(mydata, "/", paste(out_pfx, ".sitecounts.tsv", sep = ""), sep = "")
+        write.table(gff[,c(4,5, 10:length(gff))], boundariesfile, quote = FALSE, sep = "\t", row.names = F)
+        write.table(counts.df, sitecountsfile, quote = FALSE, sep = "\t", row.names = F)
+```
+
+### Binning reads into genes
+
+Teh `TnGeneBin.pl` script takes in the gene boundaries and read counts per site and outputs read counts per gene and number of sites per gene. The output files will be used for the DESeq2 analysis below.
+
+```{bash, eval=FALSE}
+myPath="data/TnSeq/"
+cd $myPath
+    
+#input       
+perl scripts/TnGeneBin.pl sites/sites_input/Sau_USA300_FPR3757_input_EssentialGenes_100.boundaries.tsv sites/sites_input/Sau_USA300_FPR3757_input_EssentialGenes_100.sitecounts.tsv  
+#lac      
+perl scripts/TnGeneBin.pl sites/sites_lac/Sau_USA300_FPR3757_lac_EssentialGenes_100.boundaries.tsv sites/sites_lac/Sau_USA300_FPR3757_lac_EssentialGenes_100.sitecounts.tsv 
+```
+
+### Identifing essential genes with DESeq2
+
+This code chunk reads in the output from the binning script, performs DESeq2 analysis to identify essential genes, and outputs the results. It also outputs summary statistics about the number of significant genes to a text file. It also needs to be runned separately for each sample type (input and lac) based on the `mydata` and `ctrl_pfx` variables defined above.
+
+```{r}
+genecounts <- read.table(paste(boundariesfile, "out", sep = "."), header = T)[,-c(1,2)]
+        genecounts2 <- read.table(paste(boundariesfile, "out", sep = "."), header = T)
+        numsites <- read.table(paste(boundariesfile, "numsites.out", sep = "."), header = T)[,-c(1,2)]
+
+        genes <- data.frame(id = rep("", length(gff[,1]), stringsAsFactors = FALSE))
+        genes$id <- as.character(genes$id)
+        for (i in 1:length(gff[,1])) {
+                genes$id[i] <- strsplit(grep("locus_tag",strsplit(as.character(gff$att[i]),";")[[1]], value = T),"=")[[1]][2]
+                genes$name[i] <- strsplit(grep("Name",strsplit(as.character(gff$att[i]),";")[[1]], value = T),"=")[[1]][2]
+
+        }
+
+        write.table(genecounts2, paste(mydata, "/", paste(out_pfx, ".genecounts2.tsv", sep = ""), sep = ""), quote = FALSE, sep = "\t", row.names = FALSE)
+        
+        # Perform differential fitness analysis
+        colnames(numsites) <- colnames(gff)[10:length(gff)] #change this number based on number of columns in gff
+        numsitesout <- data.frame(numsites[,(1:ctrl_reps)])
+        numsitesout[,ctrl_reps + 1] <- rowMeans(numsites[,-(1:ctrl_reps)])
+        colnames(numsitesout)[ctrl_reps + 1] <- "Expected_numsites"
+        colData <- data.frame(c(rep(ctrl_pfx, ctrl_reps), rep("Expected", num_expected)), condition = c(rep(ctrl_pfx, ctrl_reps),rep("Expected", num_expected)))
+        numcountsout <- data.frame(genecounts2[,1:(ctrl_reps + 2)])
+        numcountsout[,ctrl_reps + 3] <- rowMeans(genecounts2[,-(1:(ctrl_reps + 2))])
+        colnames(numcountsout)[ctrl_reps + 3] <- "Expected_numreads"
+
+        
+        ###betaPrior=TRUE
+        genescds_T <- DESeqDataSetFromMatrix(countData = round(genecounts), colData = colData, design = ~ condition)
+        #genescds_T <- newCountDataSet(round(genecounts), c(rep(ctrl_pfx, ctrl_reps), rep("Expected", num_expected)))
+        #genescds_T$sizeFactor <- rep(1, length(genecounts[1,])) # This is manually set as 1 because we normalized by site above
+        genescds_T <- estimateSizeFactors(genescds_T)
+        genescds_T <- estimateDispersions(genescds_T) #can set fitType="local" if getting flag at this step for some samples
+        genescds_T <- nbinomWaldTest(genescds_T, betaPrior = TRUE)
+        res_T <- results(genescds_T, cooksCutoff = FALSE, contrast = c("condition", ctrl_pfx, "Expected"))
+        print(head(res_T)) 
+        #colnames(res_T)[4] <- paste(ctrl_pfx, "Mean", sep = "")
+        #colnames(res_T)[3] <- "ExpectedMean"
+        out_T <- cbind(res_T, genes$id, genes$name, numcountsout, numsitesout) # Uncomment if you have a kegg annotation
+        #out_T <- cbind(res_T, genes[,2:3], numsitesout) %>% tbl_df # Uncomment if you do not have a kegg annotation
+        colnames(out_T)[2] <- "log2FoldChange_TRUE"
+        colnames(out_T)[3] <- "lfcSE_TRUE"
+        colnames(out_T)[4] <- "stat_TRUE"
+        colnames(out_T)[5] <- "pvalue_TRUE"
+        colnames(out_T)[6] <- "padj_TRUE"
+        colnames(out_T)[7] <- "id"
+
+        #Count number of significant genes; can adjust pvalue and padj here based on output(s) that you are interested in
+        write(paste("\n", "Analyses with betaPrior = TRUE (l2fc shrinkage):", sep = ""), file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""), append = TRUE)
+        write(paste(paste("\n", "number of genes with pvalue <= 0.01 in TRUE:", sep = ""), sum(res_T$pvalue <= .01, na.rm = TRUE)), file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""), append = TRUE)
+        write(paste("number of genes with padj <= 0.01 in TRUE:", sum(res_T$padj <= .01, na.rm = TRUE)), file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""), append = TRUE)
+        
+        # Perform bimodal clustering and essentiality calling and output results
+        library(mclust)
+        fit_T <- Mclust(out_T$log2FoldChange_TRUE, G = 1:2, modelNames = "V")
+        summary(fit_T, parameters = TRUE)
+        category_T <- rep("",length(out_T$id))
+        for (i in 1:length(out_T$id)) {
+          if (fit_T$classification[i] == 1 & out_T$log2FoldChange_TRUE[i] < 0) {
+            category_T[i] <- "Reduced"
+          }
+          else {
+            category_T[i] <- "Unchanged"
+          }
+        }
+        
+        density_T <- densityMclust(out_T$log2FoldChange_TRUE, G = 1:2, modelNames = "V")
+        summary(density_T)
+        pdf(paste(mydata, "/", paste(out_pfx, "TRUE_histogram.pdf", sep = "_"), sep = ""), width = 10, height = 4)
+        par(mfrow = c(1,2))
+        plot(density_T, what = "density", data = out_T$log2FoldChange_TRUE, breaks = 100)
+        plot(fit_T, what = "uncertainty")
+        dev.off()
+        
+        #Count number of unchanged and reduced genes, l2fc means, and l2fc variances
+        write(paste(paste("\n", "Mclust Unchanged TRUE:", sep = ""), sum(category_T == "Unchanged")), file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""), append = TRUE)
+        write(paste("Mclust Reduced TRUE:", sum(category_T == "Reduced")), file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""), append = TRUE)
+        write(paste(paste("\n","Mclust_reduced_mean_TRUE: ", sep = ""), fit_T$parameters$mean[1], sep = ""), file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""), append = TRUE)
+        write(paste("Mclust_unchanged_mean_TRUE: ", fit_T$parameters$mean[2], sep = ""), file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""), append = TRUE)
+        write(paste(paste("\n", "Mclust_reduced_variance_TRUE: ", sep = ""), fit_T$parameters$variance$sigmasq[1], sep = ""), file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""), append = TRUE)
+        write(paste("Mclust_unchanged_variance_TRUE: ", fit_T$parameters$variance$sigmasq[2], sep = ""), file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""), append = TRUE)
+        
+        fit_T$uncertainty[which(out_T$log2FoldChange_TRUE > 0)] <- 0
+        print(head(category_T, 10))
+        essentiality_T <- as.data.frame(cbind(category_T, fit_T$uncertainty))
+        colnames(essentiality_T) <- c("Essentiality_TRUE", "Uncertainty_TRUE")
+        out_T <- cbind(out_T, essentiality_T) 
+        
+        #Count number of significant genes with reduced Mclust; can adjust padj (or pvalue) and uncertaintly values here based on output(s) that you are interested in
+        write(paste("\n", "Reduced and Uncertainty <=0.01 if TRUE:", sum(out_T$Essentiality_TRUE == "Reduced" & as.numeric(as.character(out_T$Uncertainty_TRUE)) <= 0.01)), file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""), append = TRUE)
+        write(paste("Reduced and Uncertainty <=0.01 and padj <=0.01 if TRUE:", sum(out_T$Essentiality_TRUE == "Reduced" & out_T$padj_TRUE <= .01 & as.numeric(as.character(out_T$Uncertainty_TRUE)) <= 0.01, na.rm = TRUE)), file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""), append = TRUE)
+        write(paste("\n", "Reduced and Uncertainty <=0.05 if TRUE:", sum(out_T$Essentiality_TRUE == "Reduced" & as.numeric(as.character(out_T$Uncertainty_TRUE)) <= 0.05)), file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""), append = TRUE)
+        write(paste("Reduced and Uncertainty <=0.05 and padj <=0.05 if TRUE:", sum(out_T$Essentiality_TRUE == "Reduced" & out_T$padj_TRUE <= .05 & as.numeric(as.character(out_T$Uncertainty_TRUE)) <= 0.05, na.rm = TRUE)), file = paste(mydata, "/", paste(out_pfx, "_stats.txt", sep = ""), sep = ""), append = TRUE)
+        
+        write.csv(out_T, file = paste(mydata, "/", paste(out_pfx, ".TRUE.DESeq.csv", sep = ""), sep = ""), row.names = T)
+```

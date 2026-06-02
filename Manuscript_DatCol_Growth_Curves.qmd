@@ -1,0 +1,313 @@
+---
+format:
+  html:
+    suppress-bibliography: true
+---
+
+# Growth Curves {.unnumbered}
+
+```{r}
+# loading packages
+library(tidyverse)
+library(ggtext)
+library(kableExtra)
+library(pracma)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+
+source("R/LMM_functions.R")
+```
+
+## Data Input 
+
+All data inputs and outputs in this repo are relative to **FOLDER_PATH**. Please, save the provided data frames in RDS format in the `dataframes` folder.
+
+```{r}
+# Load the BOX_PATH environment variable
+FOLDER_PATH <- Sys.getenv("BOX_PATH") 
+
+# Define subdirectories within the Box folder
+dataframes_folder <- file.path(FOLDER_PATH, "dataframes")
+
+outputs_folder <- file.path(FOLDER_PATH, "outputs/GC_OD600")
+if (!dir.exists(outputs_folder)) {
+  dir.create(outputs_folder, recursive = TRUE)
+}
+```
+
+```{r}
+# Read the provided RDS file
+dataframeID <- "DatCol"
+GC_OD600_data <- readRDS(file.path(dataframes_folder, paste0(dataframeID, "_GC_OD600.rds")))
+```
+
+```{r}
+# Filter the data to include only time points up to 20 hours and exclude the Uncolonized control
+GC_OD600_20h <- GC_OD600_data %>%
+  filter(time <= 20) %>%
+  filter(label != "NB")
+
+# Summarize data by calculating mean and SEM for each time point and condition
+GC_OD600_20h_summarized <- GC_OD600_20h %>%
+  group_by(label, media, time, strain, vector) %>%
+  summarise(
+    mean_OD600 = mean(OD600),
+    sem_OD600 = sd(OD600) / sqrt(n()),  
+    .groups = "drop"
+  ) 
+```
+
+```{r}
+GC_plot_function <- function(data, media_filter, ymin = 0, ymax = 1.8) {
+  # Filter data based on date and media type
+  filtered_data <- data %>%
+    filter(media %in% media_filter) %>%
+    droplevels()
+  
+  # Create the growth curve plot
+  growth_curve_plot <- ggplot(filtered_data, aes(x = time, y = mean_OD600, color = strain, shape = vector)) +
+    geom_line() +
+    geom_point(size = 3) +
+    
+    scale_color_manual(
+      values = c(
+        Parent  = "#5F05AF",
+        "dat::Tn"  = "#2FD612",
+        Δalr1 = "#03C0FF"
+      ),
+      labels = c(
+        Parent = "<b><span style='color:#5F05AF'>parent<span></b>",
+        "dat::Tn" = "<b><span style='color:#2FD612'><i>dat</i>::Tn<span></b>",
+        "Δalr1" = "<b><span style='color:#03C0FF'>Δ  <i>alr1</i><span></b>"
+      )
+    ) +
+    scale_shape_manual(
+      values = c(
+        None     = 16,  # filled circle
+        EV     = 1,   # empty circle
+        "PpepV dat"  = 17,  # filled triangle
+        "Pdat dat"   = 2,   # empty triangle
+        alr1  = 15   # filled square
+      ),
+      labels = c(
+        None = "None",
+        EV = "EV",
+        "PpepV dat" = "P<i><sub>pepV</sub>dat</i>",
+        "Pdat dat" = "P<i><sub>dat</sub>dat</i>",
+        alr1 = "P<i><sub>alr1</sub>alr1</i>"
+      )
+    ) +
+    
+    geom_errorbar(aes(ymin = mean_OD600 - sem_OD600, ymax = mean_OD600 + sem_OD600), width = 0.2) +
+    
+    labs(title = paste(paste(media_filter)),
+         x = "Time (hours)",
+         y = "Mean OD<sub>600</sub> ± SEM") +
+    
+    scale_y_continuous(limits = c(ymin, ymax), expand = c(0, 0)) +
+    theme_bw() +
+    theme(
+      plot.title = element_text(vjust = -10, hjust = 0.05, size = 14, face = "bold"),
+      legend.text = element_markdown(size = 12),
+      legend.title = element_markdown(size = 12),
+      panel.grid = element_blank(),
+      text = element_text(size = 16, color = "black"),
+      axis.text = element_markdown(color = "black"),
+      axis.title.y = element_markdown()
+    ) +
+    
+    guides(color = guide_legend(override.aes = list(linetype = 0, shape = NA), keywidth = 0))                               
+  
+  return(growth_curve_plot)
+}
+```
+
+## Main figure 
+
+```{r, fig.width=10, fig.height=6, fig.align="center"}
+figMain <- GC_plot_function(GC_OD600_20h_summarized %>% filter (vector != "None"), media_filter = c("CDM19 - ala"), ymin = 0, ymax = 1.5)
+figMain
+
+# Save the plot
+ggsave(filename = file.path(outputs_folder, "figMain.png"), plot = figMain, width = 10, height = 6, dpi = 300)
+saveRDS(figMain, file.path(outputs_folder, "figMain.rds"))
+```
+
+## Stats and Supplemental Figures
+
+The Area Under the Curve (AUC) was calculated for each growth curve to quantitatively compare the growth across different conditions. The AUC was computed using the trapezoidal rule from the `pracma` package.
+
+```{r}
+# Calculate AUC for each growth curve using package pracma's trapz function, which performs numerical integration using the trapezoidal rule.
+GC_AUC <- GC_OD600_20h %>%
+  mutate(
+    media = recode(media, "CDM19 - ala" = "CDM19Ala"),
+    across(where(is.character), ~ str_replace_all(.x, " ", "")),
+    across(where(is.factor), ~ factor(str_replace_all(as.character(.x), " ", "")))
+  ) %>%
+  group_by(label, media, strain, vector, date) %>%  
+  summarise(AUC = trapz(time, OD600), .groups = "drop")
+
+# Make a dataframe for each media condion for stats 
+GC_AUC_CDM19Ala <- GC_AUC %>%
+  filter(media == "CDM19Ala") %>%
+  droplevels()
+
+GC_AUC_TSB <- GC_AUC %>%
+  filter(media == "TSB") %>%
+  droplevels()
+
+GC_AUC_CDM20 <- GC_AUC %>%
+  filter(media == "CDM20") %>%
+  droplevels()
+```
+
+Data for each media conditions were analyzed separately using a LMM to determine statistical significance with `label` as fixed effects and experimental date as a random effect.
+We analyzed pairwise contrasts between Parent with the EV or no vector compared to all other strains. Also we look at all contrast within the strains dat::Tn and Δalr1.
+We then adjusted the p-values for multiple comparisons using the Holm method and created a `sign` annotation column to indicate which comparisons are statistically significant with p<0.05. 
+
+### TSB
+
+```{r}
+# Run the mixed model with emmeans contrasts for the JE2 dataset.
+stats_results_AUC_TSB <- mixed_model_with_emmeans(
+  input_data = GC_AUC_TSB, response = "AUC", log_response = FALSE, adjust = "none",
+  fixed_effects = c("label"), random_effects1 = "date"
+)
+stats_formated_AUC_TSB <- format_stats_results(stats_results_AUC_TSB)
+stats_formated_AUC_TSB$main = stats_formated_AUC_TSB$main %>%
+  filter(condition1 == "Parent" | condition2 == "Parent" | condition1 == "Parent_EV" | condition2 == "Parent_EV" 
+         | (grepl("dat::Tn", condition1) & grepl("dat::Tn", condition2))
+         | (grepl("Δalr1", condition1) & grepl("Δalr1", condition2))
+  ) %>%
+  mutate(
+    p.value.adj = p.adjust(p.value, method = "holm"),
+    sign = case_when(p.value.adj < 0.05 ~ "*", TRUE ~ "")
+  )
+
+# Save the stats results
+saveRDS(stats_formated_AUC_TSB, file.path(outputs_folder, "stats_results_AUC_TSB.rds"))
+```
+
+```{r}
+# Render the results
+cat("Model Formula:", format(stats_results_AUC_TSB$model_formula))
+kable(stats_formated_AUC_TSB$random_effects, caption = "Random Effects")
+kable(stats_formated_AUC_TSB$anova, caption = "ANOVA Table")
+kable(stats_formated_AUC_TSB$main %>%
+    mutate(
+      p.value.anova = formatC(p.value.anova, format = "e", digits = 2),
+      p.value = formatC(p.value, format = "e", digits = 2),
+      p.value.adj = formatC(p.value.adj, format = "e", digits = 2)
+    )  %>%
+    select(effect_name, p.value.anova,  condition1, condition2, predicted_mean.1, predicted_mean.2, FC, log2FC, p.value, p.value.adj, sign),
+  caption = "Main Contrasts with Predicted Log2FC"
+)
+```
+
+```{r, fig.width=10, fig.height=6, fig.align="center"}
+figSuppA <- GC_plot_function(GC_OD600_20h_summarized, media_filter = c("TSB"), ymin = 0, ymax = 1.5)
+figSuppA
+
+# Save the plot
+ggsave(filename = file.path(outputs_folder, "figSuppA.png"), plot = figSuppA, width = 10, height = 6, dpi = 300)
+saveRDS(figSuppA, file.path(outputs_folder, "figSuppA.rds"))
+```
+
+### CDM20
+
+```{r}
+# Run the mixed model with emmeans contrasts for the JE2 dataset.
+stats_results_AUC_CDM20 <- mixed_model_with_emmeans(
+  input_data = GC_AUC_CDM20, response = "AUC", log_response = FALSE, adjust = "none",
+  fixed_effects = c("label"), random_effects1 = "date"
+)
+stats_formated_AUC_CDM20 <- format_stats_results(stats_results_AUC_CDM20)
+stats_formated_AUC_CDM20$main = stats_formated_AUC_CDM20$main %>%
+  filter(condition1 == "Parent" | condition2 == "Parent" | condition1 == "Parent_EV" | condition2 == "Parent_EV" 
+         | (grepl("dat::Tn", condition1) & grepl("dat::Tn", condition2))
+         | (grepl("Δalr1", condition1) & grepl("Δalr1", condition2))
+  ) %>%
+  mutate(
+    p.value.adj = p.adjust(p.value, method = "holm"),
+    sign = case_when(p.value.adj < 0.05 ~ "*", TRUE ~ "")
+  )
+
+# Save the stats results
+saveRDS(stats_formated_AUC_CDM20, file.path(outputs_folder, "stats_results_AUC_CDM20.rds"))
+```
+
+```{r}
+# Render the results
+cat("Model Formula:", format(stats_results_AUC_CDM20$model_formula))
+kable(stats_formated_AUC_CDM20$random_effects, caption = "Random Effects")
+kable(stats_formated_AUC_CDM20$anova, caption = "ANOVA Table")
+kable(stats_formated_AUC_CDM20$main %>%
+    mutate(
+      p.value.anova = formatC(p.value.anova, format = "e", digits = 2),
+      p.value = formatC(p.value, format = "e", digits = 2),
+      p.value.adj = formatC(p.value.adj, format = "e", digits = 2)
+    )  %>%
+    select(effect_name, p.value.anova,  condition1, condition2, predicted_mean.1, predicted_mean.2, FC, log2FC, p.value, p.value.adj, sign),
+  caption = "Main Contrasts with Predicted Log2FC"
+)
+```
+
+```{r, fig.width=10, fig.height=6, fig.align="center"}
+figSuppB <- GC_plot_function(GC_OD600_20h_summarized, media_filter = c("CDM20"), ymin = 0, ymax = 1.5)
+figSuppB
+
+# Save the plot
+ggsave(filename = file.path(outputs_folder, "figSuppB.png"), plot = figSuppB, width = 10, height = 6, dpi = 300)
+saveRDS(figSuppB, file.path(outputs_folder, "figSuppB.rds"))
+```
+
+### CDM19 - ala
+
+```{r}
+# Run the mixed model with emmeans contrasts for the JE2 dataset.
+stats_results_AUC_CDM19Ala <- mixed_model_with_emmeans(
+  input_data = GC_AUC_CDM19Ala, response = "AUC", log_response = FALSE, adjust = "none",
+  fixed_effects = c("label"), random_effects1 = "date"
+)
+stats_formated_AUC_CDM19Ala <- format_stats_results(stats_results_AUC_CDM19Ala)
+stats_formated_AUC_CDM19Ala$main = stats_formated_AUC_CDM19Ala$main %>%
+  filter(condition1 == "Parent" | condition2 == "Parent" | condition1 == "Parent_EV" | condition2 == "Parent_EV" 
+         | (grepl("dat::Tn", condition1) & grepl("dat::Tn", condition2))
+         | (grepl("Δalr1", condition1) & grepl("Δalr1", condition2))
+  ) %>%
+  mutate(
+    p.value.adj = p.adjust(p.value, method = "holm"),
+    sign = case_when(p.value.adj < 0.05 ~ "*", TRUE ~ "")
+  )
+
+# Save the stats results
+saveRDS(stats_formated_AUC_CDM19Ala, file.path(outputs_folder, "stats_results_AUC_CDM19Ala.rds"))
+```
+
+```{r}
+# Render the results
+cat("Model Formula:", format(stats_results_AUC_CDM19Ala$model_formula))
+kable(stats_formated_AUC_CDM19Ala$random_effects, caption = "Random Effects")
+kable(stats_formated_AUC_CDM19Ala$anova, caption = "ANOVA Table")
+kable(stats_formated_AUC_CDM19Ala$main %>%
+    mutate(
+      p.value.anova = formatC(p.value.anova, format = "e", digits = 2),
+      p.value = formatC(p.value, format = "e", digits = 2),
+      p.value.adj = formatC(p.value.adj, format = "e", digits = 2)
+    )  %>%
+    select(effect_name, p.value.anova,  condition1, condition2, predicted_mean.1, predicted_mean.2, FC, log2FC, p.value, p.value.adj, sign),
+  caption = "Main Contrasts with Predicted Log2FC"
+)
+```
+
+```{r, fig.width=10, fig.height=6, fig.align="center"}
+figSuppC <- GC_plot_function(GC_OD600_20h_summarized, media_filter = c("CDM19 - ala"), ymin = 0, ymax = 1.5)
+figSuppC
+
+# Save the plot
+ggsave(filename = file.path(outputs_folder, "figSuppC.png"), plot = figSuppC, width = 10, height = 6, dpi = 300)
+saveRDS(figSuppC, file.path(outputs_folder, "figSuppC.rds"))
+```
+

@@ -1,0 +1,27 @@
+﻿func_COG24_CATEGORY_LETTER,func_COG24_CATEGORY,func_COG24_CATEGORY_GROUP,func_COG24_CATEGORY_SHORT,func_COG24_color
+J,"Translation, ribosomal structure and biogenesis",INFORMATION STORAGE AND PROCESSING,J: Translation & ribosomes,#375431
+A,RNA processing and modification,INFORMATION STORAGE AND PROCESSING,A: RNA processing & modification,#85d94a
+K,Transcription,INFORMATION STORAGE AND PROCESSING,K: Transcription,#9fc298
+L,"Replication, recombination and repair",INFORMATION STORAGE AND PROCESSING,"L: Replication, recombination & repair",#579141
+B,Chromatin structure and dynamics,INFORMATION STORAGE AND PROCESSING,B: Chromatin structure & dynamics,#71dd92
+D,"Cell cycle control, cell division, chromosome partitioning",CELLULAR PROCESSES AND SIGNALING,D: Cell cycle,#f00a0a
+Y,Nuclear structure,CELLULAR PROCESSES AND SIGNALING,Y: Nuclear structure,#F77F00
+V,Defense mechanisms,CELLULAR PROCESSES AND SIGNALING,V: Defense mechanisms,#FFBA08
+T,Signal transduction mechanisms,CELLULAR PROCESSES AND SIGNALING,T: Signal transduction mechanisms,#E76F51
+M,Cell wall/membrane/envelope biogenesis,CELLULAR PROCESSES AND SIGNALING,M: Cell wall/membrane/envelope,#A63A50
+N,Cell motility,CELLULAR PROCESSES AND SIGNALING,N: Cell motility,#D98C42
+Z,Cytoskeleton,CELLULAR PROCESSES AND SIGNALING,Z: Cytoskeleton,#FF9E5D
+W,Extracellular structures,CELLULAR PROCESSES AND SIGNALING,W: Extracellular structures,#C45508
+U,"Intracellular trafficking, secretion, and vesicular transport",CELLULAR PROCESSES AND SIGNALING,"U: Trafficking, secretion  & vesicules",#c9304c
+O,"Posttranslational modification, protein turnover, chaperones",CELLULAR PROCESSES AND SIGNALING,"O: Posttranslational, turnover & chaperones",#8B4513
+X,"Mobilome: prophages, transposons",CELLULAR PROCESSES AND SIGNALING,"X: Mobilome (prophages, transposons)",#F4A261
+C,Energy production and conversion,METABOLISM,C: Energy production & conversion,#8dcce3
+G,Carbohydrate transport and metabolism,METABOLISM,G: Carbohydrate transport & metabolism,#5752da
+E,Amino acid transport and metabolism,METABOLISM,E: Amino acid transport & metabolism,#5391a5
+F,Nucleotide transport and metabolism,METABOLISM,F: Nucleotide transport & metabolism,#434eaf
+H,Coenzyme transport and metabolism,METABOLISM,H: Coenzyme transport & metabolism,#1f2d41
+I,Lipid transport and metabolism,METABOLISM,I: Lipid transport & metabolism,#4a6385
+P,Inorganic ion transport and metabolism,METABOLISM,P: Inorganic ion transport & metabolism,#353972
+Q,"Secondary metabolites biosynthesis, transport and catabolism",METABOLISM,Q: Secondary metabolism,#7d93da
+R,General function prediction only,POORLY CHARACTERIZED,R: General function prediction only,#b2b4b3
+S,Function unknown,POORLY CHARACTERIZED,S: Function unknown,#5A5A5A

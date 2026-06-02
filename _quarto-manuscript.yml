@@ -1,0 +1,22 @@
+project:
+  output-dir: docs
+    
+execute:
+  echo: true
+  eval: true
+  message: false
+  warning: false
+  
+book:  
+  chapters:
+    - index.qmd
+    - Manuscript_DatCol_Tn-Seq_Pipeline.qmd
+    - Manuscript_DatCol_Tn-Seq_Figures.qmd
+    - Manuscript_DatCol_LDH.qmd
+    - Manuscript_DatCol_Growth_Curves.qmd
+    - Manuscript_DatCol_HNO_Competition.qmd
+    - Manuscript_DatCol_HNO_Complementation.qmd
+    - Manuscript_DatCol_HNO_Cps.qmd
+    - Manuscript_DatCol_LMMStats.qmd
+    - Manuscript_DatCol_RSession.qmd
+    - references.qmd

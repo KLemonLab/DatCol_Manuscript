@@ -1,0 +1,322 @@
+---
+format:
+  html:
+    suppress-bibliography: true
+---
+
+# LDH Assays {.unnumbered}
+
+```{r}
+# loading packages and functions
+library(tidyverse)
+library(kableExtra)
+library(ggtext)
+library(scales)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(ggpubr)
+
+source("R/LMM_functions.R")
+```
+
+## Data Input 
+
+```{r}
+# Load the BOX_PATH environment variable
+FOLDER_PATH <- Sys.getenv("BOX_PATH") 
+
+# Define subdirectories within the Box folder
+dataframes_folder <- file.path(FOLDER_PATH, "dataframes")
+rawdata_folder <- file.path(FOLDER_PATH, "rawdata/LDH")
+
+outputs_folder <- file.path(FOLDER_PATH, "outputs/LDH")
+if (!dir.exists(outputs_folder)) {
+  dir.create(outputs_folder, recursive = TRUE)
+}
+```
+
+```{r}
+# Read the provided RDS file
+dataframeID <- "DatCol"
+LDH <- readRDS(file.path(dataframes_folder, paste0(dataframeID, "_LDH_HNO.rds")))
+```
+
+```{r}
+# Compute fold change of LDH values at final timepoint relative to initial timepoint for each date/line/nickname group.
+LDH_FC <- LDH %>%
+  mutate(timepoint = if_else(time == 0, "initial", "final")) %>%
+  
+  # compute avg per group but keep original rows
+  group_by(date, line, nickname, timepoint) %>%
+  mutate(avg_Value = mean(Abs, na.rm = TRUE)) %>%
+  ungroup() %>%
+  
+  # pivot the averages wider (one row per date/line/nickname)
+  distinct(date, line, nickname, timepoint, avg_Value) %>%
+  pivot_wider(
+    names_from = timepoint,
+    values_from = avg_Value
+  ) %>%
+  
+  # compute ratio
+  mutate(ratio = final / initial)
+```
+
+```{r}
+# Separate dataframes for each plot 
+LDH_FC_hla <- LDH_FC %>% 
+  filter(date %in% c("2/6/2025","2/13/2025","2/19/2025","4/8/2025")) %>% 
+  droplevels()
+
+LDH_FC_Tn <- LDH_FC %>% 
+  filter(date %in% c("10/1/2024","10/22/2024")) %>% 
+  droplevels()
+
+LDH_FC_Other <- LDH_FC %>% 
+  filter(date %in% c("4/18/2026", "4/20/2026", "4/21/2026", "4/25/2026", "4/28/2026", "5/5/2026", "5/6/2026")) %>% 
+  droplevels()
+```
+
+```{r}
+# Function to create a ggplot with jittered points, emmeans predictions with error bars, and a dashed line at y=1.
+plot_ldh_function <- function(formated_stats_results, ymin_exp, ymax_exp, title_x = " ", title_y = " ",
+                             x_var, y_var, x_labels, fill_var, shape_var, facet_var,
+                             fill_colors, shape_leves, fill_title, shape_title) {
+  
+  annot <- formated_stats_results$main %>%
+    filter(sign == "*") %>%
+    mutate(sign = "")
+  
+  plot <- ggplot(data = formated_stats_results$input_data) +
+    geom_hline(yintercept = 1, linetype = "dashed", color = "black", linewidth = 0.8) +
+    geom_jitter(
+      aes(x = {{ x_var }}, y = {{ y_var }}, fill = {{ fill_var }}, shape = {{ shape_var }}),
+      size  = 4, stroke = 0.01, width = 0.2, color = "white") +
+    
+    geom_point(data = formated_stats_results$predictions, aes(x = {{ x_var }}, y = predicted_mean), shape = 3, size = 1) +
+    geom_errorbar(data = formated_stats_results$predictions, aes(x = {{ x_var }},
+                                                                 y = predicted_mean,
+                                                                 ymin = predicted_lower,
+                                                                 ymax = predicted_upper),
+                  width = .15) +
+    
+    scale_fill_manual(values = fill_colors, name = fill_title) +
+    scale_shape_manual(values = shape_leves, name = shape_title) +
+    scale_x_discrete(labels = x_labels) +
+    scale_y_continuous(limits = c(ymin_exp, ymax_exp)) +
+    
+    guides(
+      fill  = guide_legend(override.aes = list(shape = 21, color = "white", size = 3, stroke = 2)),
+      shape = guide_legend(override.aes = list(fill = "black", size = 3, stroke = 2))) +
+    
+    labs(x = title_x, y = title_y) +
+    theme_bw() +
+    theme(
+      panel.grid    = element_blank(),
+      panel.spacing = unit(0, "lines"),
+      strip.text.x = element_markdown(size = 14, face = "bold", color = "black"),
+      text          = element_text(size = 16, color = "black"),
+      axis.text.x   = element_markdown(angle = 45, hjust = 1, color = "black"),
+      axis.text.y   = element_text(color = "black")
+    )
+  
+  if (nrow(annot) > 0) {
+    plot <- plot +
+      stat_pvalue_manual(annot, label = "sign", y.position = ymax_exp, 
+                         step.increase = -0.04, tip.length = 0.01, bracket.shorten = 0.2, vjust = 0.6, bracket.size = 0.5) 
+  }
+  
+  return(plot)
+}
+```
+
+## Statistical Analysis
+
+Fold change between groups was compared using a LMM with colonizing strain as fixed effect and experimental date as a random effect (line was singular, or not part of the experimental design).
+We analyzed pairwise contrasts comparing only to the uncolonized condition.
+We then adjusted the p-values for multiple comparisons using the Holm method and created a `sign` annotation column to indicate which comparisons are statistically significant with p<0.05.
+Vertical brackets represent model-predicted mean values and confidence intervals (± 2 × SEM), back-transformed to the original response scale.
+
+### hla
+
+```{r}
+# Run the mixed model with emmeans contrasts for the hla dataset.
+stats_results_hla <- mixed_model_with_emmeans(
+  input_data = LDH_FC_hla, response = "ratio", log_response = FALSE, adjust = "holm",
+  fixed_effects = c("nickname"), random_effects1 = "line", random_effects2 = "date"
+)
+stats_formated_hla <- format_stats_results(stats_results_hla)
+
+# Filter the contrasts to only include comparisons to the "Uncol" condition.
+# Pvalues are adjusted using the Holm method only for the contrasts that are being kept and the significance annotation is added accordingly.
+stats_formated_hla$main <- stats_formated_hla$main %>%
+  filter(condition1 == "Uncol") %>%
+  mutate(
+    p.value.adj = p.adjust(p.value, method = "holm"),
+    sign = case_when(p.value.adj < 0.05 ~ "*", TRUE ~ "")
+  )
+
+# Save the stats results
+saveRDS(stats_formated_hla, file.path(outputs_folder, "stats_results_HNO_LDH_hla.rds"))
+```
+
+```{r}
+# Render the results
+cat("Model Formula:", format(stats_results_hla$model_formula))
+kable(stats_formated_hla$random_effects, caption = "Random Effects")
+kable(stats_formated_hla$anova, caption = "ANOVA Table")
+kable(stats_formated_hla$main %>%
+    mutate(
+      p.value.anova = formatC(p.value.anova, format = "e", digits = 2),
+      p.value = formatC(p.value, format = "e", digits = 2),
+      p.value.adj = formatC(p.value.adj, format = "e", digits = 2)
+    )  %>%
+    select(effect_name, p.value.anova,  condition1, condition2, predicted_mean.1, predicted_mean.2, FC, log2FC, p.value, p.value.adj, sign),
+  caption = "Main Contrasts with Predicted Log2FC"
+)
+```
+
+```{r, fig.width=10, fig.height=6, fig.align="center"}
+plot_hla <- plot_ldh_function(
+  formated_stats_results = stats_formated_hla,
+  x_var       = nickname, title_x = " ",
+  y_var       = ratio, title_y = "FC LDH to 0 h", ymin_exp = -3, ymax_exp = 15,
+  fill_var    = nickname, fill_colors = c("grey", "#D8BAF6", "#5F05AF"), fill_title = "Strain",
+  shape_var   = line, shape_leves = c(21, 22), shape_title = "HNO line",
+  x_labels = c(
+    "JE2" = "wild type",
+    "JE2 hla::Tn" = "<i>hla</i>::Tn",
+    "Uncol" = "Uncol"
+  )
+)
+
+plot_hla
+
+# Save the plot
+ggsave(filename = file.path(outputs_folder, "HNO_LDH_hla.png"), plot = plot_hla, width = 10, height = 6, dpi = 300)
+saveRDS(plot_hla, file.path(outputs_folder, "HNO_LDH_hla.rds"))
+```
+
+### Tn
+
+```{r}
+# Run the mixed model with emmeans contrasts for the hla dataset.
+stats_results_Tn <- mixed_model_with_emmeans(
+  input_data = LDH_FC_Tn, response = "ratio", log_response = FALSE, adjust = "holm",
+  fixed_effects = c("nickname"), random_effects1 = "date"
+)
+stats_formated_Tn <- format_stats_results(stats_results_Tn)
+
+# Filter the contrasts to only include comparisons to the "Uncol" condition.
+# Pvalues are adjusted using the Holm method only for the contrasts that are being kept and the significance annotation is added accordingly.
+stats_formated_Tn$main <- stats_formated_Tn$main %>%
+  filter(condition1 == "Uncol") %>%
+  mutate(
+    p.value.adj = p.adjust(p.value, method = "holm"),
+    sign = case_when(p.value.adj < 0.05 ~ "*", TRUE ~ "")
+  )
+
+# Save the stats results
+saveRDS(stats_formated_Tn, file.path(outputs_folder, "stats_results_HNO_LDH_Tn.rds"))
+```
+
+```{r}
+# Render the results
+cat("Model Formula:", format(stats_results_Tn$model_formula))
+kable(stats_formated_Tn$random_effects, caption = "Random Effects")
+kable(stats_formated_Tn$anova, caption = "ANOVA Table")
+kable(stats_formated_Tn$main %>%
+    mutate(
+      p.value.anova = formatC(p.value.anova, format = "e", digits = 2),
+      p.value = formatC(p.value, format = "e", digits = 2),
+      p.value.adj = formatC(p.value.adj, format = "e", digits = 2)
+    )  %>%
+    select(effect_name, p.value.anova,  condition1, condition2, predicted_mean.1, predicted_mean.2, FC, log2FC, p.value, p.value.adj, sign),
+  caption = "Main Contrasts with Predicted Log2FC"
+)
+```
+
+```{r, fig.width=10, fig.height=6, fig.align="center"}
+plot_Tn <- plot_ldh_function(
+  formated_stats_results = stats_formated_Tn,
+  x_var       = nickname, title_x = " ",
+  y_var       = ratio, title_y = "FC LDH to 0 h", ymin_exp = -0.5, ymax_exp = 6,
+  fill_var    = nickname, fill_colors = c("gray", "#5F05AF", "#5F05AF"), fill_title = "Strain",
+  shape_var   = line, shape_leves = c(23), shape_title = "HNO line",
+  x_labels = c(
+    "LAC" = "LAC",
+    "LAC Tn Library" = "LAC Tn Lib",
+    "Uncol" = "Uncol"
+  )
+)
+
+plot_Tn
+
+# Save the plot
+ggsave(filename = file.path(outputs_folder, "HNO_LDH_Tn.png"), plot = plot_Tn, width = 10, height = 6, dpi = 300)
+saveRDS(plot_Tn, file.path(outputs_folder, "HNO_LDH_Tn.rds"))
+```
+
+### Other Strains
+
+```{r}
+# Run the mixed model with emmeans contrasts for the hla dataset.
+stats_results_Other <- mixed_model_with_emmeans(
+  input_data = LDH_FC_Other, response = "ratio", log_response = FALSE, adjust = "holm",
+  fixed_effects = c("nickname"), random_effects1 = "date"
+)
+stats_formated_Other <- format_stats_results(stats_results_Other)
+
+# Filter the contrasts to only include comparisons to the "Uncol" condition.
+# Pvalues are adjusted using the Holm method only for the contrasts that are being kept and the significance annotation is added accordingly.
+stats_formated_Other$main <- stats_formated_Other$main %>%
+  filter(condition1 == "Uncol") %>%
+  mutate(
+    p.value.adj = p.adjust(p.value, method = "holm"),
+    sign = case_when(p.value.adj < 0.05 ~ "*", TRUE ~ "")
+  )
+
+# Save the stats results
+saveRDS(stats_formated_Other, file.path(outputs_folder, "stats_results_HNO_LDH_Other.rds"))
+```
+
+```{r}
+# Render the results
+cat("Model Formula:", format(stats_results_Other$model_formula))
+kable(stats_formated_Other$random_effects, caption = "Random Effects")
+kable(stats_formated_Other$anova, caption = "ANOVA Table")
+kable(stats_formated_Other$main %>%
+    mutate(
+      p.value.anova = formatC(p.value.anova, format = "e", digits = 2),
+      p.value = formatC(p.value, format = "e", digits = 2),
+      p.value.adj = formatC(p.value.adj, format = "e", digits = 2)
+    )  %>%
+    select(effect_name, p.value.anova,  condition1, condition2, predicted_mean.1, predicted_mean.2, FC, log2FC, p.value, p.value.adj, sign),
+  caption = "Main Contrasts with Predicted Log2FC"
+)
+```
+
+```{r, fig.width=10, fig.height=6, fig.align="center"}
+plot_Other <- plot_ldh_function(
+  formated_stats_results = stats_formated_Other,
+  x_var       = nickname, title_x = " ",
+  y_var       = ratio, title_y = "FC LDH to 0 h", ymin_exp = -0.5, ymax_exp = 6,
+  fill_var    = nickname, fill_colors = c("grey", "#5F05AF", "#5F05AF", "#5F05AF"), fill_title = "Strain",
+  shape_var   = line, shape_leves = c(21, 22), shape_title = "HNO line",
+  x_labels = c(
+    "502a" = "502A",
+    "KPL2715" = "KPL2715",
+    "KPL4559" = "AH2623",
+    "Uncol" = "Uncol"
+  )
+)
+
+plot_Other
+
+# Save the plot
+ggsave(filename = file.path(outputs_folder, "HNO_LDH_Other.png"), plot = plot_Other, width = 10, height = 6, dpi = 300)
+saveRDS(plot_Other, file.path(outputs_folder, "HNO_LDH_Other.rds"))
+```
+
+

@@ -1,0 +1,110 @@
+---
+format:
+  html:
+    suppress-bibliography: true
+---
+
+# Linear Mixed Model Workflow {.unnumbered}
+
+```{r}
+# functions
+source("R/LMM_functions.R")
+```
+
+This notebook documents the shared Linear Mixed-effects Model (LMM) workflow used throughout this repository. Each analysis notebook focuses on dataset-specific preprocessing, visualization, and interpretation, while calling shared functions to perform the statistical analysis.
+
+The shared functions used throughout the repository and defined in `R/LMM_functions.R` are:
+
+-   `mixed_model_with_emmeans()`
+-   `format_stats_results()`
+
+## `mixed_model_with_emmeans()`
+
+This function fits a linear mixed-effects model and returns a structured list containing model summaries, ANOVA results, estimated marginal means, and post hoc contrasts.
+
+### Inputs
+
+-   `input_data`: data frame containing the variables used in the model
+-   `response`: name of the response variable as a character string
+-   `log_response`: logical; if `TRUE`, the response is modeled as `log(response)`
+-   `fixed_effects`: character vector of fixed-effect variable names; if more than one fixed effect is provided, interaction terms are included in the model
+-   `random_effects1`: first random effect, typically a grouping factor such as `line`
+-   `random_effects2`: optional second random effect, typically `date`, used to define an additional random grouping term (`random_effects1:random_effects2`) and as a fallback random effect if singularity is detected
+-   `adjust`: p-value adjustment method passed to `emmeans` for multiple comparisons (for example `"holm"`, `"bonferroni"`, or `"fdr"`)
+
+### What it does
+
+The function programmatically constructs a model formula from the supplied arguments. If `log_response = TRUE`, the response variable is log-transformed before fitting. For example:
+
+-   one fixed effect: `log(response) ~ factor1 + (1|line)`
+-   two fixed effects: `log(response) ~ factor1 * factor2 + (1|line) + (1|line:date)`
+
+The function then:
+
+-   fits the model with `lmer()` from the **lme4** [@lme4] package
+-   checks model singularity with `isSingular()`
+-   if singularity is detected and `random_effects2` is provided, simplifies the random-effects structure and refits the model using the same fixed-effects formula but with `(1|random_effects2)` as the random effect
+-   extracts summaries of the random and fixed effects
+-   computes ANOVA statistics using the **lmerTest** [@lmerTest] package, which provides F-tests and p-values using the default Satterthwaite approximation for denominator degrees of freedom
+-   computes estimated marginal means and pairwise contrasts for the specified fixed effects and, when applicable, interaction contrasts, using the **emmeans** [@emmeans] package with p-values adjusted by the specified method
+-   returns estimated marginal mean predictions and approximate confidence bounds; if the response variable was log-transformed, these predictions are back-transformed to the original response scale for interpretability
+
+### Outputs
+
+The returned object is a list containing:
+
+-   `input_data`: the input data with a combined `condition` column added for downstream matching and plotting
+-   `model_formula`: the fitted model formula
+-   `anova`: ANOVA table for the fitted model
+-   `random_effects`: variance components extracted from the random-effects structure
+-   `fixed_effects`: fixed-effect coefficient table from `summary(model)`
+-   `emmeans_formula`: formula used to generate estimated marginal means
+-   `emmeans_contrasts`: pairwise contrasts for main effects and, when applicable, interactions
+-   `emmeans_predictions`: estimated marginal means with back-transformed predictions and confidence bounds
+
+### Function definition
+
+```{r, echo=FALSE, results='asis'}
+cat("```r\n")
+cat(paste(deparse(mixed_model_with_emmeans), collapse = "\n"))
+cat("\n```")
+```
+
+## `format_stats_results()`
+
+This function takes the output of `mixed_model_with_emmeans()` and reformats it into tidy tables that are easier to join, filter, annotate, and plot.
+
+### Inputs
+
+-   `stats_results`: the list returned by `mixed_model_with_emmeans()`
+-   `grouping_vars`: variables used to summarize the original observed data alongside model predictions. The default is `condition`, a combined variable created in `mixed_model_with_emmeans()`, but additional variables from the original data can be included when needed for downstream plotting or annotation.
+-   `p.value_threshold`: threshold used to create a simple significance label column (`sign`); the default is `0.05`
+
+### What it does
+
+This function:
+
+-   summarizes the original observed data by group and calculates the mean and standard error for each group, which can be used for plotting alongside model predictions
+-   joins those summaries to the `emmeans` predictions
+-   matches each contrast to its corresponding predicted means, allowing calculation of fold changes (FC) and log2 fold changes (log2FC) between contrast groups
+-   returns a clean structure for downstream visualization and reporting, including columns named `group1` and `group2` that can be used to annotate significant differences in plots, as well as a simple significance label (`sign`) based on the specified p-value threshold
+
+### Outputs
+
+The returned object is a list containing:
+
+-   `input_data`: the original input data with a combined `condition` column
+-   `predictions`: estimated marginal means joined with observed summary statistics
+-   `main`: formatted main-effect contrasts with columns for `group1`, `group2`, `FC`, `log2FC`, and `sign`
+-   `interaction`: formatted interaction contrasts, if present
+-   `anova`: passed through from `mixed_model_with_emmeans()`
+-   `random_effects`: passed through from `mixed_model_with_emmeans()`
+-   `fixed_effects`: passed through from `mixed_model_with_emmeans()`
+
+### Function definition
+
+```{r, echo=FALSE, results='asis'}
+cat("```r\n")
+cat(paste(deparse(format_stats_results), collapse = "\n"))
+cat("\n```")
+```
