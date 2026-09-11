@@ -1,0 +1,89 @@
+
+This repository contains all data, analysis code and documentation for the manuscript:
+
+### D-alanine Aminotransferase (Dat) promotes *Staphylococcus aureus* colonization fitness on human nasal respiratory epithelium
+
+
+## Reproducibility
+
+All analyses are provided as individual Quarto (`.qmd`) notebooks, which can be rendered independently. Each notebook reads processed `.rds` files from the `dataframes/` folder and generates publication-quality figures and statistical outputs (Table S2).
+
+To reproduce the analyses:
+
+-   Clone or download this [repository](https://github.com/KLemonLab/DatCol_Manuscript) to your local machine.
+-   Download the `dataframes/` and `Tn-Seq/` folders and place it in your working directory.
+-   Download all `.qmd` notebooks from the repository and keep them in the same directory.
+-   Install required R packages listed in [R Session Info](Manuscript_DatCol_RSession.html) using `renv` or manually.
+-   Render the notebooks using Quarto to generate figures and results.
+
+You can set environment variable as follows in R:
+
+```{r, eval = FALSE}
+Sys.setenv(BOX_PATH = "/path/to/your_project")
+```
+
+Alternatively, you can add this to your `.Renviron` file:
+
+```{r, eval = FALSE}
+BOX_PATH=/path/to/your_project
+```
+
+The whole project can be rendered using RStudio's "Render" or "Build" options or in the terminal via:
+
+```{bash, eval = FALSE}
+quarto render
+```
+
+## Repository Structure
+
+This repository is organized as follows:
+
+```         
+DatCol_project/
+├── dataframes/          
+│   ├── [input data / CSV tables]
+│   ├── [input data / RDS files]
+│   └── …
+├── Tn-Seq/
+│   ├── RefSeqs/
+│   │   ├── [reference sequence files]
+│   │   └── …
+│   ├── sites/
+│   │   ├── [insertion site files]
+│   │   └── …
+│   ├── scripts/
+│   │   └── TnGeneBin.pl
+└── [analysis notebooks saved as .qmd files]
+```
+
+### Data folders
+
+-   [dataframes](https://github.com/KLemonLab/DatCol_Manuscript/tree/main/dataframes)/
+    -   Contains all processed data used to generate figures and statistical analyses (see Table S2)
+    -   Files are provided in `.csv` and `.rds` formats for easy visualization and reproducibility in R
+    -   `.rds` file names correspond to their associated `.qmd` analysis notebooks
+    -   `DatCol_CFUs_HNO_Chemical.rds` and `DatCol_CFUs_HNO_Genetic.rds` both correspond to the *Complementation* notebook
+    -   `DatCol_CFUs_HNO_Controls.rds` contains all monocolonization control data associated with `HNO_Competition.qmd`
+-   [Tn-Seq](https://github.com/KLemonLab/DatCol_Manuscript/tree/main/Tn-Seq)/
+    -   Raw FASTQ files are available through the SRA \[insert link or BioProject accession\]
+    -   Processed insertion site files are included here to reproduce the Essential Gene Analysis and associated figure generation
+    -   Subfolders include:
+        -   `RefSeqs/`: reference genome files
+        -   `sites/`: transposon insertion site files
+        -   `scripts/`: includes the `TnGeneBin.pl` Perl script used to bin insertion sites for essential gene analysis
+
+### Analysis Notebooks
+
+-   Main Analysis Notebooks:
+    -   [Tn-Seq Pipeline](Manuscript_DatCol_Tn-Seq_Pipeline.html)
+    -   [Tn-Seq Essential Genes Analysis](Manuscript_DatCol_Tn-Seq_Figures.html)
+    -   [Competition Assays on HNO-ALI](Manuscript_DatCol_HNO_Competition.html)
+    -   [Complementation Assays on HNO-ALI](Manuscript_DatCol_HNO_Complementation.html)
+    -   [Growth Curves (OD600)](Manuscript_DatCol_Growth_Curves.html)
+    -   [Cocolonization Assays with *Corynebacterium pseudodiphtheriticum*](Manuscript_DatCol_HNO_Cps.html)
+    -   [Cytotoxicity Assays (LDH)](Manuscript_DatCol_LDH.html)
+    -   [Alanine in HNO-ALI mucus](Manuscript_DatCol_HNO_Alanine.html)
+-   Other Notebooks:
+    -   [Linear Mixed Model Workflow](Manuscript_DatCol_LMMStats.html)
+    -   [R Session Info](Manuscript_DatCol_RSession.html)
+    -   [References](references.html)
