@@ -440,8 +440,8 @@ plot_CI_Other <- plot_CI_function(
 plot_CI_Other <- plot_CI_Other +
   geom_vline(xintercept = c(2.5, 3.5), color = "grey70", linewidth = 0.5) +
   annotate("text", x = 1.5, y = Inf, label = "CC8", vjust = -0.5, fontface = "bold") +
-  annotate("text", x = 3.0, y = Inf, label = "CC30", vjust = -0.5, fontface = "bold") +
-  annotate("text", x = 4, y = Inf, label = "CC5", vjust = -0.5, fontface = "bold") +
+  annotate("text", x = 3.0, y = Inf, label = "CC5", vjust = -0.5, fontface = "bold") +
+  annotate("text", x = 4, y = Inf, label = "CC30", vjust = -0.5, fontface = "bold") +
   coord_cartesian(clip = "off") +   
   theme(plot.margin = margin(t = 30))
 

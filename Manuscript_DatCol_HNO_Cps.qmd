@@ -107,7 +107,7 @@ plot_Cps_function <- function(formated_stats_results, ymin_exp, ymax_exp, title_
     scale_x_discrete(labels = x_labels) +
     
     guides(
-      fill  = guide_legend(override.aes = list(shape = 21, color = "white", size = 3, stroke = 2)),
+      fill  = guide_legend(override.aes = list(shape = 22, color = "white", size = 3, stroke = 2)),
       shape = guide_legend(override.aes = list(fill = "black", size = 3, stroke = 2))) +
     
     scale_y_log10(
@@ -138,7 +138,7 @@ plot_CFUs_Cps <- plot_Cps_function(
   x_var       = culture_pair, title_x = " ",
   y_var       = CFU_HNO, title_y = "CFUs/HNO-ALI", ymin_exp = 1, ymax_exp = 10,
   fill_var    = strain, fill_colors = c("#5F05AF", "#2FD612"), fill_title = "Condition",
-  shape_var   = line, shape_leves = c(21, 22), shape_title = "HNO line",
+  shape_var   = line, shape_leves = c(22), shape_title = "HNO line",
   facet_var   = strain, facet_colors = c("#5F05AF", "#2FD612"),
   facet_labels = c("JE2" = "parent", "dat" = "<i>dat</i>::Tn"),
   

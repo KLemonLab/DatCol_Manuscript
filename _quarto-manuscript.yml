@@ -17,6 +17,7 @@ book:
     - Manuscript_DatCol_HNO_Competition.qmd
     - Manuscript_DatCol_HNO_Complementation.qmd
     - Manuscript_DatCol_HNO_Cps.qmd
+    - Manuscript_DatCol_HNO_Alanine.qmd
     - Manuscript_DatCol_LMMStats.qmd
     - Manuscript_DatCol_RSession.qmd
     - references.qmd

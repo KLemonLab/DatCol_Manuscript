@@ -9,7 +9,7 @@
 <meta name="author" content="Andrea Boyd">
 <meta name="author" content="Katia Quintanilla">
 <meta name="author" content="Isabel F. Escapa">
-<meta name="dcterms.date" content="2026-06-02">
+<meta name="dcterms.date" content="2026-09-03">
 
 <title>DatCol</title>
 <style>
@@ -4492,20 +4492,20 @@ vertical-align: -.125em;
     <span class="navbar-title">DatCol</span>
     </a>
   </div>
-            <div id="quarto-search" class="" title="Search"></div>
+            <div id="quarto-search" class title="Search"></div>
           <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
   <span class="navbar-toggler-icon"></span>
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll ms-auto">
   <li class="nav-item compact">
-    <a class="nav-link" href="https://github.com/KLemonLab/DatCol" rel="" target=""><i class="bi bi-github" role="img" aria-label="GitHub">
+    <a class="nav-link" href="https://github.com/KLemonLab/DatCol" rel target><i class="bi bi-github" role="img" aria-label="GitHub">
 </i> 
  <span class="menu-text"></span></a>
   </li>  
 </ul>
             <div class="quarto-navbar-tools">
-  <a href="" class="quarto-reader-toggle quarto-navigation-tool px-1" onclick="window.quartoToggleReader(); return false;" title="Toggle reader mode">
+  <a href class="quarto-reader-toggle quarto-navigation-tool px-1" onclick="window.quartoToggleReader(); return false;" title="Toggle reader mode">
   <div class="quarto-reader-toggle-btn">
   <i class="bi"></i>
   </div>
@@ -4522,7 +4522,7 @@ vertical-align: -.125em;
       <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./index.html">Overview</a></li></ol></nav>
       <a class="flex-grow-1" role="button" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar,#quarto-sidebar-glass" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
       </a>
-      <button type="button" class="btn quarto-search-button" aria-label="" onclick="window.quartoOpenSearch();">
+      <button type="button" class="btn quarto-search-button" aria-label onclick="window.quartoOpenSearch();">
         <i class="bi bi-search"></i>
       </button>
     </div>
@@ -4534,7 +4534,7 @@ vertical-align: -.125em;
   <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal sidebar-navigation docked overflow-auto">
         <div class="mt-2 flex-shrink-0 align-items-center">
         <div class="sidebar-search">
-        <div id="quarto-search" class="" title="Search"></div>
+        <div id="quarto-search" class title="Search"></div>
         </div>
         </div>
     <div class="sidebar-menu-container"> 
@@ -4585,6 +4585,12 @@ vertical-align: -.125em;
   <div class="sidebar-item-container"> 
   <a href="./Manuscript_DatCol_HNO_Cps.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">CFUs Cocolonization with Cps</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./Manuscript_DatCol_HNO_Alanine.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Alanine Concentration in AODM and HNO Mucus</span></a>
   </div>
 </li>
         <li class="sidebar-item">
@@ -4651,7 +4657,7 @@ vertical-align: -.125em;
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">June 2, 2026</p>
+      <p class="date">September 3, 2026</p>
     </div>
   </div>
   
@@ -4689,7 +4695,7 @@ This repository contains all data, analysis code and documentation for the manus
 </ul>
 <p>You can set environment variable as follows in R:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">Sys.setenv</span>(<span class="at">BOX_PATH =</span> <span class="st">"/path/to/your_project"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">Sys.setenv</span>(<span class="at">BOX_PATH =</span> <span class="st">&quot;/path/to/your_project&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Alternatively, you can add this to your <code>.Renviron</code> file:</p>
 <div class="cell">
@@ -4754,6 +4760,7 @@ This repository contains all data, analysis code and documentation for the manus
 <li><a href="Manuscript_DatCol_Growth_Curves.html">Growth Curves (OD600)</a></li>
 <li><a href="Manuscript_DatCol_HNO_Cps.html">Cocolonization Assays with <em>Corynebacterium pseudodiphtheriticum</em></a></li>
 <li><a href="Manuscript_DatCol_LDH.html">Cytotoxicity Assays (LDH)</a></li>
+<li><a href="Manuscript_DatCol_HNO_Alanine.html">Alanine in HNO-ALI mucus</a></li>
 </ul></li>
 <li>Other Notebooks:
 <ul>
@@ -5063,7 +5070,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
         <span class="nav-page-text">Tn-Seq Pipeline</span> <i class="bi bi-arrow-right-short"></i>
       </a>
   </div>
-</nav><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
+</nav><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class>
 <div class="sourceCode" id="cb5" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="an">execute:</span></span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="co">  echo: true</span></span>
@@ -5074,7 +5081,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 <span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="fu"># Overview {.unnumbered}</span></span>
 <span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>::: {.callout-note icon="false"}</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>::: {.callout-note icon=&quot;false&quot;}</span>
 <span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="fu">## This repository contains all data, analysis code and documentation for the manuscript:</span></span>
 <span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>D-alanine Aminotransferase (Dat) promotes Staphylococcus aureus colonization fitness on human nasal respiratory epithelium</span>
@@ -5095,7 +5102,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 <span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>You can set environment variable as follows in R:</span>
 <span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a><span class="in">```{r, eval = FALSE}</span></span>
-<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a><span class="fu">Sys.setenv</span>(<span class="at">BOX_PATH =</span> <span class="st">"/path/to/your_project"</span>)</span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a><span class="fu">Sys.setenv</span>(<span class="at">BOX_PATH =</span> <span class="st">&quot;/path/to/your_project&quot;</span>)</span>
 <span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a>Alternatively, you can add this to your <span class="in">`.Renviron`</span> file:</span>
@@ -5104,7 +5111,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 <span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a>BOX_PATH<span class="ot">=</span><span class="er">/</span>path<span class="sc">/</span>to<span class="sc">/</span>your_project</span>
 <span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a>The whole project can be rendered using RStudio's "Render" or "Build" options or in the terminal via:</span>
+<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a>The whole project can be rendered using RStudio&#39;s &quot;Render&quot; or &quot;Build&quot; options or in the terminal via:</span>
 <span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a><span class="in">```{bash, eval = FALSE}</span></span>
 <span id="cb5-44"><a href="#cb5-44" aria-hidden="true" tabindex="-1"></a><span class="ex">quarto</span> render</span>
@@ -5158,10 +5165,11 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 <span id="cb5-92"><a href="#cb5-92" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Growth Curves (OD600)</span><span class="co">](Manuscript_DatCol_Growth_Curves.html)</span></span>
 <span id="cb5-93"><a href="#cb5-93" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Cocolonization Assays with *Corynebacterium pseudodiphtheriticum*</span><span class="co">](Manuscript_DatCol_HNO_Cps.html)</span></span>
 <span id="cb5-94"><a href="#cb5-94" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Cytotoxicity Assays (LDH)</span><span class="co">](Manuscript_DatCol_LDH.html)</span></span>
-<span id="cb5-95"><a href="#cb5-95" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Other Notebooks:</span>
-<span id="cb5-96"><a href="#cb5-96" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Linear Mixed Model Workflow</span><span class="co">](Manuscript_DatCol_LMMStats.html)</span></span>
-<span id="cb5-97"><a href="#cb5-97" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">R Session Info</span><span class="co">](Manuscript_DatCol_RSession.html)</span></span>
-<span id="cb5-98"><a href="#cb5-98" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">References</span><span class="co">](references.html)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb5-95"><a href="#cb5-95" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Alanine in HNO-ALI mucus</span><span class="co">](Manuscript_DatCol_HNO_Alanine.html)</span></span>
+<span id="cb5-96"><a href="#cb5-96" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Other Notebooks:</span>
+<span id="cb5-97"><a href="#cb5-97" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Linear Mixed Model Workflow</span><span class="co">](Manuscript_DatCol_LMMStats.html)</span></span>
+<span id="cb5-98"><a href="#cb5-98" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">R Session Info</span><span class="co">](Manuscript_DatCol_RSession.html)</span></span>
+<span id="cb5-99"><a href="#cb5-99" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">References</span><span class="co">](references.html)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 

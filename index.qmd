@@ -92,6 +92,7 @@ DatCol_project/
     -   [Growth Curves (OD600)](Manuscript_DatCol_Growth_Curves.html)
     -   [Cocolonization Assays with *Corynebacterium pseudodiphtheriticum*](Manuscript_DatCol_HNO_Cps.html)
     -   [Cytotoxicity Assays (LDH)](Manuscript_DatCol_LDH.html)
+    -   [Alanine in HNO-ALI mucus](Manuscript_DatCol_HNO_Alanine.html)
 -   Other Notebooks:
     -   [Linear Mixed Model Workflow](Manuscript_DatCol_LMMStats.html)
     -   [R Session Info](Manuscript_DatCol_RSession.html)

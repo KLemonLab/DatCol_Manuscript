@@ -1,0 +1,145 @@
+---
+format:
+  html:
+    suppress-bibliography: true
+---
+
+# Alanine Concentration in AODM and HNO Mucus {.unnumbered}
+
+```{r}
+# loading packages and functions
+library(tidyverse)
+library(kableExtra)
+library(ggtext)
+library(scales)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(ggh4x)
+library(ggpubr)
+
+source("R/LMM_functions.R")
+```
+
+## Data Input 
+
+All data inputs and outputs in this repo are relative to **FOLDER_PATH**. Please, save the provided data frames in RDS format in the `dataframes` folder.
+
+```{r}
+# Load the BOX_PATH environment variable
+FOLDER_PATH <- Sys.getenv("BOX_PATH") 
+
+# Define subdirectories within the Box folder
+dataframes_folder <- file.path(FOLDER_PATH, "dataframes")
+
+outputs_folder <- file.path(FOLDER_PATH, "outputs/Alanine")
+if (!dir.exists(outputs_folder)) {
+  dir.create(outputs_folder, recursive = TRUE)
+}
+```
+
+```{r}
+# Read the provided RDS file
+dataframeID <- "DatCol"
+HNO_Alanine <- readRDS(file.path(dataframes_folder, paste0(dataframeID, "_Alanine.rds")))
+```
+
+uM Alanine concentratio (uM) between groups was compared using a LMM to determine statistical significance with `condition` as fixed effect and experimental date as a random effect (line was singular).
+Vertical brackets represent model-predicted mean values and confidence intervals (± 2 × SEM), back-transformed to the original response scale. 
+
+```{r}
+# Run the mixed model with emmeans contrasts
+stats_results_alanine <- mixed_model_with_emmeans(
+  input_data = HNO_Alanine, response = "alanine", log_response = FALSE, adjust = "none",
+  fixed_effects = c("condition"), random_effects1 = "date"
+)
+stats_formated_alanine <- format_stats_results(stats_results_alanine)
+
+# Save the stats results
+saveRDS(stats_formated_alanine, file.path(outputs_folder, "stats_results_alanine.rds"))
+```
+
+```{r}
+# Render the results
+cat("Model Formula:", format(stats_results_alanine$model_formula))
+kable(stats_formated_alanine$random_effects, caption = "Random Effects")
+kable(stats_formated_alanine$anova, caption = "ANOVA Table")
+kable(stats_formated_alanine$main %>%
+    mutate(
+      p.value.anova = formatC(p.value.anova, format = "e", digits = 2),
+      p.value = formatC(p.value, format = "e", digits = 2)
+    ) %>%
+    select(effect_name, p.value.anova, contrast, condition1, condition2, FC, log2FC, p.value, sign),
+  caption = "Main Contrasts with Predicted Log2FC"
+)
+```
+
+```{r}
+# Function to create a ggplot with jittered points, emmeans predictions with error bars
+plot_alanine_function <- function(formated_stats_results, ymin, ymax, title_x = " ", title_y = " ",
+                             x_var, y_var, x_labels, shape_var, facet_var,
+                             shape_leves, fill_title, shape_title) {
+  
+  annot <- formated_stats_results$main %>%
+    filter(sign == "*") %>%
+    mutate(sign = "")
+  
+  plot <- ggplot(data = formated_stats_results$input_data) +
+    geom_jitter(
+      aes(x = {{ x_var }}, y = {{ y_var }}, shape = {{ shape_var }}),
+      size  = 4, stroke = 0.01, width = 0.2, color = "white", fill = "gray") +
+    
+    geom_point(data = formated_stats_results$predictions, aes(x = {{ x_var }}, y = predicted_mean), shape = 3, size = 1) +
+    geom_errorbar(data = formated_stats_results$predictions, aes(x = {{ x_var }},
+                                                                 y = predicted_mean,
+                                                                 ymin = predicted_lower,
+                                                                 ymax = predicted_upper),
+                  width = .15) +
+    
+    scale_shape_manual(values = shape_leves, name = shape_title) +
+    scale_x_discrete(labels = x_labels) +
+    scale_y_continuous(limits = c(ymin, ymax)) +
+    
+    guides(
+      shape = guide_legend(override.aes = list(fill = "black", size = 3, stroke = 2))) +
+    
+    labs(x = title_x, y = title_y) +
+    theme_bw() +
+    theme(
+      panel.grid    = element_blank(),
+      panel.spacing = unit(0, "lines"),
+      strip.text.x = element_markdown(size = 14, face = "bold", color = "black"),
+      text          = element_text(size = 16, color = "black"),
+      axis.text.x   = element_markdown(angle = 45, hjust = 1, color = "black"),
+      axis.text.y   = element_text(color = "black")
+    )
+  
+  if (nrow(annot) > 0) {
+    plot <- plot +
+      stat_pvalue_manual(annot, label = "sign", y.position = ymax, 
+                         step.increase = -0.04, tip.length = 0.01, bracket.shorten = 0.2, vjust = 0.6, bracket.size = 0.5) 
+  }
+  
+  return(plot)
+}
+```
+
+```{r, fig.width=10, fig.height=6, fig.align="center"}
+stats_formated_alanine <- format_stats_results(stats_results_alanine, grouping_vars = c("condition"))
+
+# Create the plot using the function defined above
+plot_alanine <- plot_alanine_function(
+  formated_stats_results = stats_formated_alanine,
+  x_var       = condition, title_x = " ",
+  y_var       = alanine, title_y = "μM Alanine", ymin = 0, ymax = 300,
+  shape_var   = line, shape_leves = c(21, 23), shape_title = "HNO line",
+  x_labels <- c("Mucus" = "HNO-ALI mucus layer","AODM" = "basal AODM"))
+
+
+plot_alanine
+
+ggsave(filename = file.path(outputs_folder, "HNO_alanine.png"), plot = plot_alanine, width = 6, height = 5, dpi = 300)
+saveRDS(plot_alanine, file.path(outputs_folder, "HNO_alanine.rds"))
+```
+
+

@@ -206,17 +206,21 @@ stats_results_Chem <- mixed_model_with_emmeans(
   fixed_effects = c("label"), random_effects1 = "line", random_effects2 = "date"
 )
 stats_formated_Chem <- format_stats_results(stats_results_Chem, grouping_vars = c("condition", "plot_label", "parent_strain", "aa"))
+```
 
-# Filter the contrasts to only include those comparing to the unsuplemented JE2 and dat.
+```{r}
+# Filter the contrasts to only include those comparing to the unsupplemented JE2, dat and alr1 strains.
 # Pvalues are adjusted using the Holm method only for the contrasts that are being kept and the significance annotation is added accordingly.
 stats_formated_Chem$main = stats_formated_Chem$main %>%
-  filter(condition1 == "JE2" | condition1 == "dat") %>%
-  filter(!(grepl("dat", condition1) & grepl("JE2", condition2))) %>%
+  filter(condition1 == "JE2" | condition1 == "dat" | condition1 == "alr1") %>%
+  filter(!(grepl("dat", condition1) & grepl("JE2|alr1", condition2))) %>%
+  filter(!(grepl("alr1", condition1) & grepl("JE2|dat", condition2))) %>%
   mutate(
     p.value.adj = p.adjust(p.value, method = "holm"),
     sign = case_when(
       p.value.adj < 0.05 & condition1 == "JE2" ~ "a",
       p.value.adj < 0.05 & condition1 == "dat" ~ "b",
+      p.value.adj < 0.05 & condition1 == "alr1" ~ "c",
       TRUE ~ ""
     )
   )
@@ -247,9 +251,9 @@ plot_HNO_CFUs_Chem <- plot_CFUs_function(
   x_var       = plot_label, title_x = " ",
   y_var       = CFU_HNO, title_y = "CFUs/HNO-ALI", ymin_exp = 1, ymax_exp = 10,
   fill_var    = aa, fill_colors = c("gray80", "#09582A", "#A5DEA7", "#F50BEF", "#FFB0FD"), fill_title = "Vector",
-  shape_var   = line, shape_leves = c(21, 22), shape_title = "HNO line",
-  facet_var   = parent_strain, facet_colors = c("#5F05AF", "#2FD612"),
-  facet_labels = c("JE2" = "parent", "dat" = "<i>dat</i>::Tn")
+  shape_var   = line, shape_leves = c(21, 22, 23), shape_title = "HNO line",
+  facet_var   = parent_strain, facet_colors = c("#5F05AF", "#2FD612", "#03C0FF"),
+  facet_labels = c("JE2" = "parent", "dat" = "<i>dat</i>::Tn", "alr1" = "Δ<i> alr1</i>")
 )
 ```
 
