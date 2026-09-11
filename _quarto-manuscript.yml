@@ -1,13 +1,42 @@
 project:
+  type: book
   output-dir: docs
-    
+  
 execute:
   echo: true
   eval: true
   message: false
   warning: false
   
-book:  
+format:
+  html:
+    theme: sandstone
+    code-tools: true
+    toc: true
+    toc-location: left
+    embed-resources: true
+    page-layout: full
+
+book:
+  title: "DatCol"
+  author:
+    - name: Andrea Boyd
+    - name: Katia Quintanilla
+    - name: Isabel F. Escapa
+  date: last-modified
+  sidebar:
+    style: docked
+    background: "light"
+    collapse-level: 1
+  navbar:
+    background: "primary"
+    search: true
+    right:
+      - icon: github
+        href: https://github.com/KLemonLab/DatCol_Manuscript
+        aria-label: GitHub
+
+  reader-mode: true  
   chapters:
     - index.qmd
     - Manuscript_DatCol_Tn-Seq_Pipeline.qmd
@@ -21,3 +50,6 @@ book:
     - Manuscript_DatCol_LMMStats.qmd
     - Manuscript_DatCol_RSession.qmd
     - references.qmd
+    
+bibliography: references.bib
+csl: references_style.csl
