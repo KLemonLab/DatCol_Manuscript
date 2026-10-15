@@ -70,7 +70,7 @@ DatCol_Manuscript/
     -   `DatCol_CFUs_HNO_Chemical.rds` and `DatCol_CFUs_HNO_Genetic.rds` both correspond to the *Complementation* notebook
     -   `DatCol_CFUs_HNO_Controls.rds` contains all monocolonization control data associated with `HNO_Competition.qmd`
 -   [Tn-Seq](https://github.com/KLemonLab/DatCol_Manuscript/tree/main/Tn-Seq)/
-    -   Raw FASTQ files are available through the SRA \[insert link or BioProject accession\]
+    -   Raw FASTQ files are available through the SRA under BioProject [PRJNA1521769](https://www.ncbi.nlm.nih.gov/bioproject/PRJNA1521769)
     -   Processed insertion site files are included here to reproduce the Essential Gene Analysis and associated figure generation
     -   Subfolders include:
         -   `RefSeqs/`: reference genome, annotation and COG category files
