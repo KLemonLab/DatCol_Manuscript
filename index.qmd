@@ -40,22 +40,25 @@ quarto render
 
 This repository is organized as follows:
 
-```         
-DatCol_project/
-├── dataframes/          
-│   ├── [input data / CSV tables]
-│   ├── [input data / RDS files]
-│   └── …
+```
+DatCol_Manuscript/
+├── .Renviron                 # sets BOX_PATH="." (the repository folder)
+├── _quarto.yml               # Quarto book configuration
+├── index.qmd                 # overview page
+├── Manuscript_DatCol_*.qmd   # analysis notebooks
+├── R/
+│   └── LMM_functions.R       # shared linear mixed model functions
+├── dataframes/               # processed input data (.csv and .rds)
 ├── Tn-Seq/
-│   ├── RefSeqs/
-│   │   ├── [reference sequence files]
-│   │   └── …
-│   ├── sites/
-│   │   ├── [insertion site files]
-│   │   └── …
-│   ├── scripts/
-│   │   └── TnGeneBin.pl
-└── [analysis notebooks saved as .qmd files]
+│   ├── RefSeqs/              # reference genome, annotation and COG files
+│   ├── sites/                # insertion sites and DESeq2 essential gene results
+│   ├── scripts/              # TnGeneBin.pl
+│   ├── tables/               # STRING enrichment results and generated tables
+│   └── figures/              # generated Tn-Seq figures
+├── outputs/                  # generated figures and statistics for each assay
+├── SupplementalTables/       # Tables S1 and S2 (.xlsx)
+├── docs/                     # rendered website (GitHub Pages)
+└── renv.lock                 # R package versions
 ```
 
 ### Data folders
@@ -70,9 +73,11 @@ DatCol_project/
     -   Raw FASTQ files are available through the SRA \[insert link or BioProject accession\]
     -   Processed insertion site files are included here to reproduce the Essential Gene Analysis and associated figure generation
     -   Subfolders include:
-        -   `RefSeqs/`: reference genome files
-        -   `sites/`: transposon insertion site files
+        -   `RefSeqs/`: reference genome, annotation and COG category files
+        -   `sites/`: transposon insertion site files and the DESeq2 essential gene results (`*.TRUE.DESeq.csv`) produced by the [Tn-Seq Pipeline](Manuscript_DatCol_Tn-Seq_Pipeline.html)
         -   `scripts/`: includes the `TnGeneBin.pl` Perl script used to bin insertion sites for essential gene analysis
+        -   `tables/`: STRING enrichment results (`STRING_Enrichment.log2FC_diff_LAC_vs_Input.tsv`) read by the [Tn-Seq Essential Genes Analysis](Manuscript_DatCol_Tn-Seq_Figures.html), plus the tables it writes
+        -   `figures/`: figures written by the [Tn-Seq Essential Genes Analysis](Manuscript_DatCol_Tn-Seq_Figures.html)
 
 ### Analysis Notebooks
 

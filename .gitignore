@@ -6,3 +6,6 @@
 DatCol_Manuscript.Rproj
 
 /.quarto/
+
+_freeze/
+*.ipynb
