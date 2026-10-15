@@ -6,6 +6,10 @@ format:
     suppress-bibliography: true
 ---
 
+```{r}
+
+```
+
 # Overview {.unnumbered}
 
 ::: {.callout-note icon="false"}
@@ -21,22 +25,10 @@ All analyses are provided as individual Quarto (`.qmd`) notebooks, which can be 
 To reproduce the analyses:
 
 -   Clone or download this [repository](https://github.com/KLemonLab/DatCol_Manuscript) to your local machine.
--   Download the `dataframes/` and `Tn-Seq/` folders and place it in your working directory.
--   Download all `.qmd` notebooks from the repository and keep them in the same directory.
 -   Install required R packages listed in [R Session Info](Manuscript_DatCol_RSession.html) using `renv` or manually.
 -   Render the notebooks using Quarto to generate figures and results.
 
-You can set environment variable as follows in R:
-
-```{r, eval = FALSE}
-Sys.setenv(BOX_PATH = "/path/to/your_project")
-```
-
-Alternatively, you can add this to your `.Renviron` file:
-
-```{r, eval = FALSE}
-BOX_PATH=/path/to/your_project
-```
+All input data (`dataframes/` and `Tn-Seq/`) is included in the repository. The notebooks read it through the `BOX_PATH` environment variable, which the `.Renviron` file at the repository root already sets to the repository folder (`BOX_PATH="."`), so no setup is needed. If you keep the data elsewhere, change that line to point to the folder that contains `dataframes/` and `Tn-Seq/`, and restart R.
 
 The whole project can be rendered using RStudio's "Render" or "Build" options or in the terminal via:
 

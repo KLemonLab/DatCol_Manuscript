@@ -19,17 +19,11 @@ This document lists all R packages used across analysis notebooks in this reposi
 # Core tidyverse (data handling + plotting)
 library(tidyverse)
 
-# Data input/output
-library(readxl)      # Read Excel files
-library(openxlsx)    # Write Excel files
-library(png)         # Read PNG images
-
 # Visualization (ggplot2 ecosystem)
 library(ggtext)      # Rich text in ggplot
 library(scales)      # Axis scaling
 library(ggh4x)       # ggplot extensions
 library(ggpubr)      # Publication-ready plots
-library(cowplot)     # Plot composition
 library(plotly)      # Interactive plots
 library(ggVennDiagram) # Venn diagrams
 library(grid)        # Low-level graphics
