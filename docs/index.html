@@ -4699,21 +4699,24 @@ This repository contains all data, analysis code and documentation for the manus
 <section id="repository-structure" class="level2">
 <h2 class="anchored" data-anchor-id="repository-structure">Repository Structure</h2>
 <p>This repository is organized as follows:</p>
-<pre><code>DatCol_project/
-├── dataframes/          
-│   ├── [input data / CSV tables]
-│   ├── [input data / RDS files]
-│   └── …
+<pre><code>DatCol_Manuscript/
+├── .Renviron                 # sets BOX_PATH="." (the repository folder)
+├── _quarto.yml               # Quarto book configuration
+├── index.qmd                 # overview page
+├── Manuscript_DatCol_*.qmd   # analysis notebooks
+├── R/
+│   └── LMM_functions.R       # shared linear mixed model functions
+├── dataframes/               # processed input data (.csv and .rds)
 ├── Tn-Seq/
-│   ├── RefSeqs/
-│   │   ├── [reference sequence files]
-│   │   └── …
-│   ├── sites/
-│   │   ├── [insertion site files]
-│   │   └── …
-│   ├── scripts/
-│   │   └── TnGeneBin.pl
-└── [analysis notebooks saved as .qmd files]</code></pre>
+│   ├── RefSeqs/              # reference genome, annotation and COG files
+│   ├── sites/                # insertion sites and DESeq2 essential gene results
+│   ├── scripts/              # TnGeneBin.pl
+│   ├── tables/               # STRING enrichment results and generated tables
+│   └── figures/              # generated Tn-Seq figures
+├── outputs/                  # generated figures and statistics for each assay
+├── SupplementalTables/       # Tables S1 and S2 (.xlsx)
+├── docs/                     # rendered website (GitHub Pages)
+└── renv.lock                 # R package versions</code></pre>
 <section id="data-folders" class="level3">
 <h3 class="anchored" data-anchor-id="data-folders">Data folders</h3>
 <ul>
@@ -4731,9 +4734,11 @@ This repository contains all data, analysis code and documentation for the manus
 <li>Processed insertion site files are included here to reproduce the Essential Gene Analysis and associated figure generation</li>
 <li>Subfolders include:
 <ul>
-<li><code>RefSeqs/</code>: reference genome files</li>
-<li><code>sites/</code>: transposon insertion site files</li>
+<li><code>RefSeqs/</code>: reference genome, annotation and COG category files</li>
+<li><code>sites/</code>: transposon insertion site files and the DESeq2 essential gene results (<code>*.TRUE.DESeq.csv</code>) produced by the <a href="Manuscript_DatCol_Tn-Seq_Pipeline.html">Tn-Seq Pipeline</a></li>
 <li><code>scripts/</code>: includes the <code>TnGeneBin.pl</code> Perl script used to bin insertion sites for essential gene analysis</li>
+<li><code>tables/</code>: STRING enrichment results (<code>STRING_Enrichment.log2FC_diff_LAC_vs_Input.tsv</code>) read by the <a href="Manuscript_DatCol_Tn-Seq_Figures.html">Tn-Seq Essential Genes Analysis</a>, plus the tables it writes</li>
+<li><code>figures/</code>: figures written by the <a href="Manuscript_DatCol_Tn-Seq_Figures.html">Tn-Seq Essential Genes Analysis</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -5093,55 +5098,60 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 <span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a>This repository is organized as follows:</span>
 <span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a><span class="in">```         </span></span>
-<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a><span class="in">DatCol_project/</span></span>
-<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a><span class="in">├── dataframes/          </span></span>
-<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── [input data / CSV tables]</span></span>
-<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── [input data / RDS files]</span></span>
-<span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a><span class="in">│   └── …</span></span>
-<span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a><span class="in">├── Tn-Seq/</span></span>
-<span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── RefSeqs/</span></span>
-<span id="cb3-52"><a href="#cb3-52" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── [reference sequence files]</span></span>
-<span id="cb3-53"><a href="#cb3-53" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   └── …</span></span>
-<span id="cb3-54"><a href="#cb3-54" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── sites/</span></span>
-<span id="cb3-55"><a href="#cb3-55" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── [insertion site files]</span></span>
-<span id="cb3-56"><a href="#cb3-56" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   └── …</span></span>
-<span id="cb3-57"><a href="#cb3-57" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── scripts/</span></span>
-<span id="cb3-58"><a href="#cb3-58" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   └── TnGeneBin.pl</span></span>
-<span id="cb3-59"><a href="#cb3-59" aria-hidden="true" tabindex="-1"></a><span class="in">└── [analysis notebooks saved as .qmd files]</span></span>
-<span id="cb3-60"><a href="#cb3-60" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb3-61"><a href="#cb3-61" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-62"><a href="#cb3-62" aria-hidden="true" tabindex="-1"></a><span class="fu">### Data folders</span></span>
-<span id="cb3-63"><a href="#cb3-63" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-64"><a href="#cb3-64" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span><span class="co">[</span><span class="ot">dataframes</span><span class="co">](https://github.com/KLemonLab/DatCol_Manuscript/tree/main/dataframes)</span>/</span>
-<span id="cb3-65"><a href="#cb3-65" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span>Contains all processed data used to generate figures and statistical analyses (see Table S2)</span>
-<span id="cb3-66"><a href="#cb3-66" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span>Files are provided in <span class="in">`.csv`</span> and <span class="in">`.rds`</span> formats for easy visualization and reproducibility in R</span>
-<span id="cb3-67"><a href="#cb3-67" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="in">`.rds`</span> file names correspond to their associated <span class="in">`.qmd`</span> analysis notebooks</span>
-<span id="cb3-68"><a href="#cb3-68" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="in">`DatCol_CFUs_HNO_Chemical.rds`</span> and <span class="in">`DatCol_CFUs_HNO_Genetic.rds`</span> both correspond to the *Complementation* notebook</span>
-<span id="cb3-69"><a href="#cb3-69" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="in">`DatCol_CFUs_HNO_Controls.rds`</span> contains all monocolonization control data associated with <span class="in">`HNO_Competition.qmd`</span></span>
-<span id="cb3-70"><a href="#cb3-70" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span><span class="co">[</span><span class="ot">Tn-Seq</span><span class="co">](https://github.com/KLemonLab/DatCol_Manuscript/tree/main/Tn-Seq)</span>/</span>
-<span id="cb3-71"><a href="#cb3-71" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span>Raw FASTQ files are available through the SRA <span class="sc">\[</span>insert link or BioProject accession<span class="sc">\]</span></span>
-<span id="cb3-72"><a href="#cb3-72" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span>Processed insertion site files are included here to reproduce the Essential Gene Analysis and associated figure generation</span>
-<span id="cb3-73"><a href="#cb3-73" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span>Subfolders include:</span>
-<span id="cb3-74"><a href="#cb3-74" aria-hidden="true" tabindex="-1"></a><span class="ss">        -   </span><span class="in">`RefSeqs/`</span>: reference genome files</span>
-<span id="cb3-75"><a href="#cb3-75" aria-hidden="true" tabindex="-1"></a><span class="ss">        -   </span><span class="in">`sites/`</span>: transposon insertion site files</span>
-<span id="cb3-76"><a href="#cb3-76" aria-hidden="true" tabindex="-1"></a><span class="ss">        -   </span><span class="in">`scripts/`</span>: includes the <span class="in">`TnGeneBin.pl`</span> Perl script used to bin insertion sites for essential gene analysis</span>
-<span id="cb3-77"><a href="#cb3-77" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-78"><a href="#cb3-78" aria-hidden="true" tabindex="-1"></a><span class="fu">### Analysis Notebooks</span></span>
-<span id="cb3-79"><a href="#cb3-79" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-80"><a href="#cb3-80" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Main Analysis Notebooks:</span>
-<span id="cb3-81"><a href="#cb3-81" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Tn-Seq Pipeline</span><span class="co">](Manuscript_DatCol_Tn-Seq_Pipeline.html)</span></span>
-<span id="cb3-82"><a href="#cb3-82" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Tn-Seq Essential Genes Analysis</span><span class="co">](Manuscript_DatCol_Tn-Seq_Figures.html)</span></span>
-<span id="cb3-83"><a href="#cb3-83" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Competition Assays on HNO-ALI</span><span class="co">](Manuscript_DatCol_HNO_Competition.html)</span></span>
-<span id="cb3-84"><a href="#cb3-84" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Complementation Assays on HNO-ALI</span><span class="co">](Manuscript_DatCol_HNO_Complementation.html)</span></span>
-<span id="cb3-85"><a href="#cb3-85" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Growth Curves (OD600)</span><span class="co">](Manuscript_DatCol_Growth_Curves.html)</span></span>
-<span id="cb3-86"><a href="#cb3-86" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Cocolonization Assays with *Corynebacterium pseudodiphtheriticum*</span><span class="co">](Manuscript_DatCol_HNO_Cps.html)</span></span>
-<span id="cb3-87"><a href="#cb3-87" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Cytotoxicity Assays (LDH)</span><span class="co">](Manuscript_DatCol_LDH.html)</span></span>
-<span id="cb3-88"><a href="#cb3-88" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Alanine in HNO-ALI mucus</span><span class="co">](Manuscript_DatCol_HNO_Alanine.html)</span></span>
-<span id="cb3-89"><a href="#cb3-89" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Other Notebooks:</span>
-<span id="cb3-90"><a href="#cb3-90" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Linear Mixed Model Workflow</span><span class="co">](Manuscript_DatCol_LMMStats.html)</span></span>
-<span id="cb3-91"><a href="#cb3-91" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">R Session Info</span><span class="co">](Manuscript_DatCol_RSession.html)</span></span>
-<span id="cb3-92"><a href="#cb3-92" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">References</span><span class="co">](references.html)</span></span>
+<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a><span class="in">DatCol_Manuscript/</span></span>
+<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a><span class="in">├── .Renviron                 # sets BOX_PATH="." (the repository folder)</span></span>
+<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a><span class="in">├── _quarto.yml               # Quarto book configuration</span></span>
+<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a><span class="in">├── index.qmd                 # overview page</span></span>
+<span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a><span class="in">├── Manuscript_DatCol_*.qmd   # analysis notebooks</span></span>
+<span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a><span class="in">├── R/</span></span>
+<span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a><span class="in">│   └── LMM_functions.R       # shared linear mixed model functions</span></span>
+<span id="cb3-52"><a href="#cb3-52" aria-hidden="true" tabindex="-1"></a><span class="in">├── dataframes/               # processed input data (.csv and .rds)</span></span>
+<span id="cb3-53"><a href="#cb3-53" aria-hidden="true" tabindex="-1"></a><span class="in">├── Tn-Seq/</span></span>
+<span id="cb3-54"><a href="#cb3-54" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── RefSeqs/              # reference genome, annotation and COG files</span></span>
+<span id="cb3-55"><a href="#cb3-55" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── sites/                # insertion sites and DESeq2 essential gene results</span></span>
+<span id="cb3-56"><a href="#cb3-56" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── scripts/              # TnGeneBin.pl</span></span>
+<span id="cb3-57"><a href="#cb3-57" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── tables/               # STRING enrichment results and generated tables</span></span>
+<span id="cb3-58"><a href="#cb3-58" aria-hidden="true" tabindex="-1"></a><span class="in">│   └── figures/              # generated Tn-Seq figures</span></span>
+<span id="cb3-59"><a href="#cb3-59" aria-hidden="true" tabindex="-1"></a><span class="in">├── outputs/                  # generated figures and statistics for each assay</span></span>
+<span id="cb3-60"><a href="#cb3-60" aria-hidden="true" tabindex="-1"></a><span class="in">├── SupplementalTables/       # Tables S1 and S2 (.xlsx)</span></span>
+<span id="cb3-61"><a href="#cb3-61" aria-hidden="true" tabindex="-1"></a><span class="in">├── docs/                     # rendered website (GitHub Pages)</span></span>
+<span id="cb3-62"><a href="#cb3-62" aria-hidden="true" tabindex="-1"></a><span class="in">└── renv.lock                 # R package versions</span></span>
+<span id="cb3-63"><a href="#cb3-63" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb3-64"><a href="#cb3-64" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-65"><a href="#cb3-65" aria-hidden="true" tabindex="-1"></a><span class="fu">### Data folders</span></span>
+<span id="cb3-66"><a href="#cb3-66" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-67"><a href="#cb3-67" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span><span class="co">[</span><span class="ot">dataframes</span><span class="co">](https://github.com/KLemonLab/DatCol_Manuscript/tree/main/dataframes)</span>/</span>
+<span id="cb3-68"><a href="#cb3-68" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span>Contains all processed data used to generate figures and statistical analyses (see Table S2)</span>
+<span id="cb3-69"><a href="#cb3-69" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span>Files are provided in <span class="in">`.csv`</span> and <span class="in">`.rds`</span> formats for easy visualization and reproducibility in R</span>
+<span id="cb3-70"><a href="#cb3-70" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="in">`.rds`</span> file names correspond to their associated <span class="in">`.qmd`</span> analysis notebooks</span>
+<span id="cb3-71"><a href="#cb3-71" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="in">`DatCol_CFUs_HNO_Chemical.rds`</span> and <span class="in">`DatCol_CFUs_HNO_Genetic.rds`</span> both correspond to the *Complementation* notebook</span>
+<span id="cb3-72"><a href="#cb3-72" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="in">`DatCol_CFUs_HNO_Controls.rds`</span> contains all monocolonization control data associated with <span class="in">`HNO_Competition.qmd`</span></span>
+<span id="cb3-73"><a href="#cb3-73" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span><span class="co">[</span><span class="ot">Tn-Seq</span><span class="co">](https://github.com/KLemonLab/DatCol_Manuscript/tree/main/Tn-Seq)</span>/</span>
+<span id="cb3-74"><a href="#cb3-74" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span>Raw FASTQ files are available through the SRA <span class="sc">\[</span>insert link or BioProject accession<span class="sc">\]</span></span>
+<span id="cb3-75"><a href="#cb3-75" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span>Processed insertion site files are included here to reproduce the Essential Gene Analysis and associated figure generation</span>
+<span id="cb3-76"><a href="#cb3-76" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span>Subfolders include:</span>
+<span id="cb3-77"><a href="#cb3-77" aria-hidden="true" tabindex="-1"></a><span class="ss">        -   </span><span class="in">`RefSeqs/`</span>: reference genome, annotation and COG category files</span>
+<span id="cb3-78"><a href="#cb3-78" aria-hidden="true" tabindex="-1"></a><span class="ss">        -   </span><span class="in">`sites/`</span>: transposon insertion site files and the DESeq2 essential gene results (<span class="in">`*.TRUE.DESeq.csv`</span>) produced by the <span class="co">[</span><span class="ot">Tn-Seq Pipeline</span><span class="co">](Manuscript_DatCol_Tn-Seq_Pipeline.html)</span></span>
+<span id="cb3-79"><a href="#cb3-79" aria-hidden="true" tabindex="-1"></a><span class="ss">        -   </span><span class="in">`scripts/`</span>: includes the <span class="in">`TnGeneBin.pl`</span> Perl script used to bin insertion sites for essential gene analysis</span>
+<span id="cb3-80"><a href="#cb3-80" aria-hidden="true" tabindex="-1"></a><span class="ss">        -   </span><span class="in">`tables/`</span>: STRING enrichment results (<span class="in">`STRING_Enrichment.log2FC_diff_LAC_vs_Input.tsv`</span>) read by the <span class="co">[</span><span class="ot">Tn-Seq Essential Genes Analysis</span><span class="co">](Manuscript_DatCol_Tn-Seq_Figures.html)</span>, plus the tables it writes</span>
+<span id="cb3-81"><a href="#cb3-81" aria-hidden="true" tabindex="-1"></a><span class="ss">        -   </span><span class="in">`figures/`</span>: figures written by the <span class="co">[</span><span class="ot">Tn-Seq Essential Genes Analysis</span><span class="co">](Manuscript_DatCol_Tn-Seq_Figures.html)</span></span>
+<span id="cb3-82"><a href="#cb3-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-83"><a href="#cb3-83" aria-hidden="true" tabindex="-1"></a><span class="fu">### Analysis Notebooks</span></span>
+<span id="cb3-84"><a href="#cb3-84" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-85"><a href="#cb3-85" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Main Analysis Notebooks:</span>
+<span id="cb3-86"><a href="#cb3-86" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Tn-Seq Pipeline</span><span class="co">](Manuscript_DatCol_Tn-Seq_Pipeline.html)</span></span>
+<span id="cb3-87"><a href="#cb3-87" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Tn-Seq Essential Genes Analysis</span><span class="co">](Manuscript_DatCol_Tn-Seq_Figures.html)</span></span>
+<span id="cb3-88"><a href="#cb3-88" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Competition Assays on HNO-ALI</span><span class="co">](Manuscript_DatCol_HNO_Competition.html)</span></span>
+<span id="cb3-89"><a href="#cb3-89" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Complementation Assays on HNO-ALI</span><span class="co">](Manuscript_DatCol_HNO_Complementation.html)</span></span>
+<span id="cb3-90"><a href="#cb3-90" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Growth Curves (OD600)</span><span class="co">](Manuscript_DatCol_Growth_Curves.html)</span></span>
+<span id="cb3-91"><a href="#cb3-91" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Cocolonization Assays with *Corynebacterium pseudodiphtheriticum*</span><span class="co">](Manuscript_DatCol_HNO_Cps.html)</span></span>
+<span id="cb3-92"><a href="#cb3-92" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Cytotoxicity Assays (LDH)</span><span class="co">](Manuscript_DatCol_LDH.html)</span></span>
+<span id="cb3-93"><a href="#cb3-93" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Alanine in HNO-ALI mucus</span><span class="co">](Manuscript_DatCol_HNO_Alanine.html)</span></span>
+<span id="cb3-94"><a href="#cb3-94" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Other Notebooks:</span>
+<span id="cb3-95"><a href="#cb3-95" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">Linear Mixed Model Workflow</span><span class="co">](Manuscript_DatCol_LMMStats.html)</span></span>
+<span id="cb3-96"><a href="#cb3-96" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">R Session Info</span><span class="co">](Manuscript_DatCol_RSession.html)</span></span>
+<span id="cb3-97"><a href="#cb3-97" aria-hidden="true" tabindex="-1"></a><span class="ss">    -   </span><span class="co">[</span><span class="ot">References</span><span class="co">](references.html)</span></span>
 </code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
